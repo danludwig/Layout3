@@ -280,6 +280,4 @@ var ViewModels;
         Establishments.Url = Url;        
     })(ViewModels.Establishments || (ViewModels.Establishments = {}));
     var Establishments = ViewModels.Establishments;
-
 })(ViewModels || (ViewModels = {}));
-

@@ -198,6 +198,4 @@ var ViewModels;
         Establishments.Item = Item;        
     })(ViewModels.Establishments || (ViewModels.Establishments = {}));
     var Establishments = ViewModels.Establishments;
-
 })(ViewModels || (ViewModels = {}));
-

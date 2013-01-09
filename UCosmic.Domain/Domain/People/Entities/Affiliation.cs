@@ -1,4 +1,7 @@
-﻿using UCosmic.Domain.Establishments;
+﻿using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using UCosmic.Domain.Establishments;
 
 namespace UCosmic.Domain.People
 {
@@ -14,9 +17,14 @@ namespace UCosmic.Domain.People
         public int EstablishmentId { get; protected internal set; }
         public virtual Establishment Establishment { get; protected internal set; }
 
+        /* If IsPrimary is true, JobTitles is considered Working Title. */
         public string JobTitles { get; protected internal set; }
 
+        /* Default affiliation should be linked to a University type Establishment. */
         public bool IsDefault { get; protected internal set; }
+
+        /* Primary affiliation is the Department (or College) the employee is primarily associated with. */
+        public bool IsPrimary { get; protected internal set; }
 
         public bool IsAcknowledged { get; protected internal set; }
         public bool IsClaimingStudent { get; protected internal set; }

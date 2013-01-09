@@ -54,7 +54,7 @@ var App;
             });
         };
         return FlasherViewModel;
-    })();    
+    })();
+    App.FlasherViewModel = FlasherViewModel;    
     App.flasher = new FlasherViewModel();
 })(App || (App = {}));
-

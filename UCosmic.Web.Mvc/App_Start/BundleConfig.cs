@@ -68,6 +68,10 @@ namespace UCosmic.Web.Mvc
                 "~/scripts/viewmodels/establishments/Url.js",
                 "~/scripts/viewmodels/establishments/Item.js"));
 
+            // employee personal info page
+            bundles.Add(new ScriptBundle("~/bundles/employees").Include(
+                "~/scripts/viewmodels/employees/PersonalInfo.js"));
+
             // bootstrap css bundles
             var tenants = new[]
             {

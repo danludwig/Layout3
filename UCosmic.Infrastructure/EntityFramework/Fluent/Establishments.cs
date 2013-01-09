@@ -239,4 +239,5 @@ namespace UCosmic.EntityFramework
             Property(t => t.BodyFormat).HasColumnType("ntext");
         }
     }
+
 }

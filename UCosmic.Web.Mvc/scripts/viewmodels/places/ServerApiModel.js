@@ -33,9 +33,6 @@ var ViewModels;
             Utils.convertToLatLngBounds = convertToLatLngBounds;
         })(Places.Utils || (Places.Utils = {}));
         var Utils = Places.Utils;
-
     })(ViewModels.Places || (ViewModels.Places = {}));
     var Places = ViewModels.Places;
-
 })(ViewModels || (ViewModels = {}));
-
