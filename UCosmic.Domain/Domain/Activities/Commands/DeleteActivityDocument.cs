@@ -1,21 +1,20 @@
 ﻿using System;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Security.Principal;
 using FluentValidation;
-using Newtonsoft.Json;
-using UCosmic.Domain.Audit;
 using UCosmic.Domain.Files;
-using UCosmic.Domain.Identity;
 
 namespace UCosmic.Domain.Activities
 {
     public class DeleteActivityDocument
     {
-        public int Id { get; set; }
+        public IPrincipal Principal { get; private set; }
+        public int Id { get; private set; }
 
-        public DeleteActivityDocument(int id)
+        public DeleteActivityDocument(IPrincipal principal, int id)
         {
+            if (principal == null) { throw new ArgumentNullException("principal"); }
+            Principal = principal;
             Id = id;
         }
     }
@@ -25,6 +24,10 @@ namespace UCosmic.Domain.Activities
         public ValidateDeleteActivityDocumentCommand(IQueryEntities entities)
         {
             CascadeMode = CascadeMode.StopOnFirstFailure;
+
+            RuleFor(x => x.Principal)
+                .MustOwnActivityDocument(entities, x => x.Id)
+                .WithMessage(MustOwnActivityDocument<object>.FailMessageFormat, x => x.Principal.Identity.Name, x => x.Id);
 
             RuleFor(x => x.Id)
                 // id must be within valid range
