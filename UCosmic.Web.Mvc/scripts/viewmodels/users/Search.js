@@ -15,6 +15,7 @@ var ViewModels;
                 this._history = ko.observableArray([]);
                 this._historyIndex = 0;
                 this.impersonateUserName = ko.observable();
+                this.flasherProxy = new App.FlasherProxy();
                 this._init();
             }
             Search.prototype._init = function () {
@@ -35,7 +36,7 @@ var ViewModels;
                 this.spinner.start();
                 this.nextForceDisabled(true);
                 this.prevForceDisabled(true);
-                $.get(App.Routes.WebApi.Users.get(), queryParameters).done(function (response, statusText, xhr) {
+                $.get(App.Routes.WebApi.Identity.Users.get(), queryParameters).done(function (response, statusText, xhr) {
                     deferred.resolve(response, statusText, xhr);
                 }).fail(function (xhr, statusText, errorThrown) {
                     deferred.reject(xhr, statusText, errorThrown);
@@ -184,13 +185,24 @@ var ViewModels;
         Users.Search = Search;        
         var SearchResult = (function () {
             function SearchResult(values, owner) {
+                var _this = this;
                 this.roleOptions = ko.observableArray();
                 this.selectedRoleOption = ko.observable();
+                this.roleSpinner = new ViewModels.Spinner({
+                    delay: 0,
+                    isVisible: true
+                });
                 this.$menu = ko.observable();
                 this.isEditingRoles = ko.observable(false);
                 this._owner = owner;
-                ko.mapping.fromJS(values, {
-                }, this);
+                var userMapping = {
+                    roles: {
+                        create: function (options) {
+                            return new ViewModels.Users.RoleGrant(options.data, _this);
+                        }
+                    }
+                };
+                ko.mapping.fromJS(values, userMapping, this);
                 this._setupPhotoComputeds();
                 this._setupNamingComputeds();
                 this._setupRoleGrantComputeds();
@@ -211,10 +223,13 @@ var ViewModels;
             SearchResult.prototype._setupRoleGrantComputeds = function () {
                 var _this = this;
                 this.hasGrants = ko.computed(function () {
-                    return _this.roleGrants().length > 0;
+                    return _this.roles().length > 0;
                 });
                 this.hasNoGrants = ko.computed(function () {
                     return !_this.hasGrants();
+                });
+                this.isRoleGrantDisabled = ko.computed(function () {
+                    return _this.roleSpinner.isVisible() || !_this.selectedRoleOption();
                 });
             };
             SearchResult.prototype._setupMenuSubscription = function () {
@@ -225,6 +240,9 @@ var ViewModels;
                 });
             };
             SearchResult.prototype._pullRoleOptions = function () {
+                var _this = this;
+                this.selectedRoleOption(undefined);
+                this.roleSpinner.start();
                 var deferred = $.Deferred();
                 var queryParameters = {
                     pageSize: Math.pow(2, 32) / 2 - 1,
@@ -234,6 +252,8 @@ var ViewModels;
                     deferred.resolve(response, statusText, xhr);
                 }).fail(function (xhr, statusText, errorThrown) {
                     deferred.reject(xhr, statusText, errorThrown);
+                }).always(function () {
+                    _this.roleSpinner.stop();
                 });
                 return deferred;
             };
@@ -242,9 +262,9 @@ var ViewModels;
                 }, this.roleOptions);
                 for(var i = 0; i < this.roleOptions().length; i++) {
                     var option = this.roleOptions()[i];
-                    for(var ii = 0; ii < this.roleGrants().length; ii++) {
-                        var grant = this.roleGrants()[ii];
-                        if(option.id() == grant.roleId()) {
+                    for(var ii = 0; ii < this.roles().length; ii++) {
+                        var grant = this.roles()[ii];
+                        if(option.id() == grant.id()) {
                             if(i === 0) {
                                 this.roleOptions.shift();
                             } else {
@@ -258,6 +278,28 @@ var ViewModels;
                         }
                     }
                 }
+            };
+            SearchResult.prototype.pullRoleGrants = function () {
+                var _this = this;
+                this.roleSpinner.start();
+                var deferred = $.Deferred();
+                $.get(App.Routes.WebApi.Identity.Users.Roles.get(this.id())).done(function (response, statusText, xhr) {
+                    deferred.resolve(response, statusText, xhr);
+                }).fail(function (xhr, statusText, errorThrown) {
+                    deferred.reject(xhr, statusText, errorThrown);
+                }).always(function () {
+                    _this.roleSpinner.stop();
+                });
+                return deferred;
+            };
+            SearchResult.prototype.loadRoleGrants = function (results) {
+                var _this = this;
+                var grantMapping = {
+                    create: function (options) {
+                        return new ViewModels.Users.RoleGrant(options.data, _this);
+                    }
+                };
+                ko.mapping.fromJS(results, grantMapping, this.roles);
             };
             SearchResult.prototype.impersonate = function () {
                 var form = this._owner.impersonateForm;
@@ -276,9 +318,59 @@ var ViewModels;
             SearchResult.prototype.hideRoleEditor = function () {
                 this.isEditingRoles(false);
             };
+            SearchResult.prototype.grantRole = function () {
+                var _this = this;
+                this.roleSpinner.start();
+                var url = App.Routes.WebApi.Identity.Roles.Grants.put(this.selectedRoleOption(), this.id());
+                $.ajax({
+                    url: url,
+                    type: 'PUT'
+                }).done(function (response, textStatus, xhr) {
+                    App.flasher.flash(response);
+                    _this.pullRoleGrants().done(function (response) {
+                        _this.loadRoleGrants(response);
+                        _this._pullRoleOptions().done(function (response) {
+                            _this._loadRoleOptions(response);
+                        });
+                    });
+                }).fail(function (arg1, arg2, arg3) {
+                    alert('fail');
+                });
+            };
+            SearchResult.prototype.revokeRole = function (roleId) {
+                var _this = this;
+                this.roleSpinner.start();
+                var url = App.Routes.WebApi.Identity.Roles.Grants.del(roleId, this.id());
+                $.ajax({
+                    url: url,
+                    type: 'DELETE'
+                }).done(function (response, textStatus, xhr) {
+                    App.flasher.flash(response);
+                    _this.pullRoleGrants().done(function (response) {
+                        _this.loadRoleGrants(response);
+                        _this._pullRoleOptions().done(function (response) {
+                            _this._loadRoleOptions(response);
+                        });
+                    });
+                }).fail(function (xhr, textStatus, errorThrown) {
+                    alert('fail ' + xhr.responseText);
+                });
+            };
             return SearchResult;
         })();
         Users.SearchResult = SearchResult;        
+        var RoleGrant = (function () {
+            function RoleGrant(values, owner) {
+                this._owner = owner;
+                ko.mapping.fromJS(values, {
+                }, this);
+            }
+            RoleGrant.prototype.revokeRole = function () {
+                this._owner.revokeRole(this.id());
+            };
+            return RoleGrant;
+        })();
+        Users.RoleGrant = RoleGrant;        
     })(ViewModels.Users || (ViewModels.Users = {}));
     var Users = ViewModels.Users;
 })(ViewModels || (ViewModels = {}));

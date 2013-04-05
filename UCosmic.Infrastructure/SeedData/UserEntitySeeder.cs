@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Principal;
 using UCosmic.Domain.Establishments;
 using UCosmic.Domain.Identity;
 using UCosmic.Domain.People;
@@ -135,6 +136,7 @@ namespace UCosmic.SeedData
                 Gender = gender,
             });
 
+            var principal = new GenericPrincipal(new GenericIdentity("ludwigd@uc.edu"), new[] { RoleName.AuthorizationAgent, });
             if (roles != null && roles.Any())
             {
                 foreach (var roleName in roles)
@@ -142,8 +144,8 @@ namespace UCosmic.SeedData
                     if (person.User.Grants.Select(g => g.Role.Name).Contains(roleName))
                         continue;
 
-                    var role = _queryProcessor.Execute(new RoleBySlug(roleName.Replace(" ", "-")));
-                    _grantRole.Handle(new GrantRoleToUser(role.EntityId, person.User.EntityId));
+                    var role = _queryProcessor.Execute(new RoleByName(principal, roleName));
+                    _grantRole.Handle(new GrantRoleToUser(principal, role.RevisionId, person.User.RevisionId));
                 }
             }
 

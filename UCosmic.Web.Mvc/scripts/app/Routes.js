@@ -27,6 +27,25 @@ var App;
                     return makeUrl('sign-out');
                 }
                 Identity.signOut = signOut;
+                (function (Users) {
+                    function get(id) {
+                        var url = 'users';
+                        if(id) {
+                            url += '/' + id;
+                        }
+                        return makeUrl(url);
+                    }
+                    Users.get = get;
+                    (function (Roles) {
+                        function get(userId) {
+                            var url = 'users/' + userId + '/roles';
+                            return makeUrl(url);
+                        }
+                        Roles.get = get;
+                    })(Users.Roles || (Users.Roles = {}));
+                    var Roles = Users.Roles;
+                })(Identity.Users || (Identity.Users = {}));
+                var Users = Identity.Users;
                 (function (Roles) {
                     function get(roleId) {
                         var url = 'roles';
@@ -36,6 +55,18 @@ var App;
                         return makeUrl(url);
                     }
                     Roles.get = get;
+                    (function (Grants) {
+                        function put(roleId, userId) {
+                            var url = 'roles/' + roleId + '/users/' + userId;
+                            return makeUrl(url);
+                        }
+                        Grants.put = put;
+                        function del(roleId, userId) {
+                            return put(roleId, userId);
+                        }
+                        Grants.del = del;
+                    })(Roles.Grants || (Roles.Grants = {}));
+                    var Grants = Roles.Grants;
                 })(Identity.Roles || (Identity.Roles = {}));
                 var Roles = Identity.Roles;
             })(WebApi.Identity || (WebApi.Identity = {}));
@@ -267,17 +298,6 @@ var App;
                 var Profile = My.Profile;
             })(WebApi.My || (WebApi.My = {}));
             var My = WebApi.My;
-            (function (Users) {
-                function get(id) {
-                    var url = 'users';
-                    if(id) {
-                        url += '/' + id;
-                    }
-                    return makeUrl(url);
-                }
-                Users.get = get;
-            })(WebApi.Users || (WebApi.Users = {}));
-            var Users = WebApi.Users;
             (function (People) {
                 (function (Photo) {
                                                             function get(id, arg1, arg2, arg3) {

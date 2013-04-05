@@ -1,67 +1,112 @@
 ﻿using System;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Security.Principal;
+using FluentValidation;
 
 namespace UCosmic.Domain.Identity
 {
     public class GrantRoleToUser
     {
-        public GrantRoleToUser(Guid roleGuid, Guid userGuid)
+        public GrantRoleToUser(IPrincipal principal, int roleId, int userId)
         {
-            if (roleGuid == Guid.Empty) throw new ArgumentException("Cannot be empty", "roleGuid");
-            if (userGuid == Guid.Empty) throw new ArgumentException("Cannot be empty", "userGuid");
-            RoleGuid = roleGuid;
-            UserGuid = userGuid;
+            if (principal == null) throw new ArgumentNullException("principal");
+            Principal = principal;
+            RoleId = roleId;
+            UserId = userId;
         }
 
-        internal GrantRoleToUser(Role role, Guid userGuid)
-        {
-            if (role == null) throw new ArgumentNullException("role");
-            if (userGuid == Guid.Empty) throw new ArgumentException("Cannot be empty", "userGuid");
-            Role = role;
-            UserGuid = userGuid;
-        }
+        public IPrincipal Principal { get; private set; }
+        public int RoleId { get; private set; }
+        public int UserId { get; private set; }
+    }
 
-        public Guid RoleGuid { get; private set; }
-        public Guid UserGuid { get; private set; }
-        public bool IsNewlyGranted { get; internal set; }
-        internal Role Role { get; set; }
+    public class ValidateGrantRoleToUserCommand : AbstractValidator<GrantRoleToUser>
+    {
+        public ValidateGrantRoleToUserCommand(IQueryEntities entities, IProcessQueries queryProcessor)
+        {
+            CascadeMode = CascadeMode.StopOnFirstFailure;
+
+            RuleFor(x => x.Principal)
+                .NotNull()
+                    .WithMessage(MustNotHaveNullPrincipal.FailMessage)
+
+                // principal must be authorized to grant roles
+                .MustBeInAnyRole(RoleName.RoleGrantors)
+                    .WithMessage(MustBeInAnyRole.FailMessageFormat, x => x.Principal.Identity.Name, x => x.GetType().Name)
+            ;
+            RuleFor(x => x.Principal.Identity.Name)
+                // principal.identity.name cannot be null or empty
+                .NotEmpty()
+                    .WithMessage(MustNotHaveEmptyPrincipalIdentityName.FailMessage)
+
+                // principal.identity.name must match User.Name entity property
+                .MustFindUserByName(entities)
+                    .WithMessage(MustFindUserByName.FailMessageFormat, x => x.Principal.Identity.Name)
+            ;
+
+            RuleFor(x => x.UserId)
+                .MustFindUserById(entities)
+                    .WithMessage(MustFindUserById.FailMessageFormat, x => x.UserId)
+            ;
+
+            RuleFor(x => x.RoleId)
+                .MustFindRoleById(entities)
+                    .WithMessage(MustFindRoleById.FailMessageFormat, x => x.RoleId)
+            ;
+
+            When(x => !x.Principal.IsInRole(RoleName.AuthorizationAgent), () =>
+            {
+                // do not let security admins grant non-tenant roles
+                RuleFor(x => x.RoleId)
+                    .MustBeTenantRole(entities)
+                        .WithMessage(MustBeTenantRole.FailMessageFormat, x => x.Principal.Identity.Name, x => x.GetType().Name, x => x.RoleId)
+                ;
+
+                // do not let security admins grant to users outside of their tenancy
+                RuleFor(x => x.UserId)
+                    .MustBeTenantUserId(queryProcessor, x => x.Principal)
+                        .WithMessage(MustBeTenantUserId<object>.FailMessageFormat, x => x.Principal.Identity.Name, x => x.GetType().Name, x => x.UserId)
+                ;
+            });
+        }
     }
 
     public class HandleGrantRoleToUserCommand : IHandleCommands<GrantRoleToUser>
     {
         private readonly ICommandEntities _entities;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public HandleGrantRoleToUserCommand(ICommandEntities entities)
+        public HandleGrantRoleToUserCommand(ICommandEntities entities, IUnitOfWork unitOfWork)
         {
             _entities = entities;
+            _unitOfWork = unitOfWork;
         }
 
         public void Handle(GrantRoleToUser command)
         {
             if (command == null) throw new ArgumentNullException("command");
 
-            var role = command.Role ??
-                _entities.Get<Role>()
+            var role = _entities.Get<Role>()
                 .EagerLoad(_entities, new Expression<Func<Role, object>>[]
                 {
                     r => r.Grants,
                 })
-                .SingleOrDefault(x => x.EntityId == command.RoleGuid);
+                .SingleOrDefault(x => x.RevisionId == command.RoleId);
             if (role == null)
-                throw new InvalidOperationException(string.Format("Role with id '{0}' does not exist.", command.RoleGuid));
+                throw new InvalidOperationException(string.Format(MustFindRoleById.FailMessageFormat, command.RoleId));
 
-            var grant = role.Grants.SingleOrDefault(x => x.User.EntityId == command.UserGuid);
+            var grant = role.Grants.SingleOrDefault(x => x.User.RevisionId == command.UserId);
             if (grant != null) return;
 
-            var user = _entities.Get<User>().SingleOrDefault(x => x.EntityId == command.UserGuid);
+            var user = _entities.Get<User>().SingleOrDefault(x => x.RevisionId == command.UserId);
             grant = new RoleGrant
             {
                 Role = role,
                 User = user,
             };
             _entities.Create(grant);
-            command.IsNewlyGranted = true;
+            _unitOfWork.SaveChanges();
         }
     }
 }

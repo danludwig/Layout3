@@ -5,10 +5,11 @@
 /// <reference path="../../sammy/sammyjs-0.7.d.ts" />
 /// <reference path="../../kendo/kendouiweb.d.ts" />
 /// <reference path="../PagedSearch.ts" />
+/// <reference path="../Flasher.ts" />
 /// <reference path="../../app/Routes.ts" />
 
 module ViewModels.Users {
-    
+
     export class Search extends ViewModels.PagedSearch {
 
         sammy: Sammy.Application = Sammy();
@@ -17,6 +18,7 @@ module ViewModels.Users {
         private _historyIndex: number = 0;
         impersonateForm: Element;
         impersonateUserName: KnockoutObservableString = ko.observable();
+        flasherProxy = new App.FlasherProxy();
 
         constructor() {
             super();
@@ -41,7 +43,7 @@ module ViewModels.Users {
             this.spinner.start();
             this.nextForceDisabled(true);
             this.prevForceDisabled(true);
-            $.get(App.Routes.WebApi.Users.get(), queryParameters)
+            $.get(App.Routes.WebApi.Identity.Users.get(), queryParameters)
             .done((response: any[], statusText: string, xhr: JQueryXHR): void => {
                 deferred.resolve(response, statusText, xhr);
             })
@@ -191,16 +193,18 @@ module ViewModels.Users {
             }
         }
     }
-    
+
     export class SearchResult {
         private _owner: Search;
         id: KnockoutObservableNumber;
         personId: KnockoutObservableNumber;
         name: KnockoutObservableString;
         personDisplayName: KnockoutObservableString;
-        roleGrants: KnockoutObservableArray;
+        roles: KnockoutObservableArray;
         roleOptions: KnockoutObservableArray = ko.observableArray();
         selectedRoleOption: KnockoutObservableNumber = ko.observable();
+        isRoleGrantDisabled: KnockoutComputed;
+        roleSpinner = new Spinner({ delay: 0, isVisible: true });
 
         $menu: KnockoutObservableJQuery = ko.observable();
         isEditingRoles: KnockoutObservableBool = ko.observable(false);
@@ -214,7 +218,14 @@ module ViewModels.Users {
             this._owner = owner;
 
             // map api data to observables
-            ko.mapping.fromJS(values, {}, this);
+            var userMapping = {
+                roles: {
+                    create: (options: any): RoleGrant => {
+                        return new ViewModels.Users.RoleGrant(options.data, this);
+                    }
+                }
+            };
+            ko.mapping.fromJS(values, userMapping, this);
 
             this._setupPhotoComputeds();
             this._setupNamingComputeds();
@@ -236,10 +247,13 @@ module ViewModels.Users {
 
         private _setupRoleGrantComputeds(): void {
             this.hasGrants = ko.computed((): bool => {
-                return this.roleGrants().length > 0;
+                return this.roles().length > 0;
             });
             this.hasNoGrants = ko.computed((): bool => {
                 return !this.hasGrants();
+            });
+            this.isRoleGrantDisabled = ko.computed((): bool => {
+                return this.roleSpinner.isVisible() || !this.selectedRoleOption();
             });
         }
 
@@ -252,9 +266,11 @@ module ViewModels.Users {
         }
 
         private _pullRoleOptions(): JQueryDeferred {
+            this.selectedRoleOption(undefined);
+            this.roleSpinner.start();
             var deferred = $.Deferred();
             var queryParameters = {
-                pageSize: Math.pow(2,32) / 2 - 1, // equivalent to int.MaxValue
+                pageSize: Math.pow(2, 32) / 2 - 1, // equivalent to int.MaxValue
                 orderBy: 'name-asc'
             };
             $.get(App.Routes.WebApi.Identity.Roles.get(), queryParameters)
@@ -263,6 +279,9 @@ module ViewModels.Users {
             })
             .fail((xhr: JQueryXHR, statusText: string, errorThrown: string): void => {
                 deferred.reject(xhr, statusText, errorThrown);
+            })
+            .always((): void => {
+                this.roleSpinner.stop();
             });
             return deferred;
         }
@@ -272,9 +291,9 @@ module ViewModels.Users {
             // remove roles that have already been granted
             for (var i = 0; i < this.roleOptions().length; i++) {
                 var option = this.roleOptions()[i];
-                for (var ii = 0; ii < this.roleGrants().length; ii++) {
-                    var grant = this.roleGrants()[ii];
-                    if (option.id() == grant.roleId()) {
+                for (var ii = 0; ii < this.roles().length; ii++) {
+                    var grant = this.roles()[ii];
+                    if (option.id() == grant.id()) {
                         if (i === 0) {
                             this.roleOptions.shift();
                         }
@@ -288,6 +307,31 @@ module ViewModels.Users {
                     }
                 }
             }
+        }
+
+        pullRoleGrants(): JQueryDeferred {
+            this.roleSpinner.start();
+            var deferred = $.Deferred();
+            $.get(App.Routes.WebApi.Identity.Users.Roles.get(this.id()))
+            .done((response: any[], statusText: string, xhr: JQueryXHR): void => {
+                deferred.resolve(response, statusText, xhr);
+            })
+            .fail((xhr: JQueryXHR, statusText: string, errorThrown: string): void => {
+                deferred.reject(xhr, statusText, errorThrown);
+            })
+            .always((): void => {
+                this.roleSpinner.stop();
+            });
+            return deferred;
+        }
+
+        loadRoleGrants(results: any): void {
+            var grantMapping = {
+                create: (options: any): RoleGrant => {
+                    return new ViewModels.Users.RoleGrant(options.data, this);
+                }
+            };
+            ko.mapping.fromJS(results, grantMapping, this.roles);
         }
 
         impersonate(): void {
@@ -307,6 +351,68 @@ module ViewModels.Users {
         }
         hideRoleEditor(): void {
             this.isEditingRoles(false);
+        }
+
+        grantRole(): void {
+            this.roleSpinner.start();
+            var url = App.Routes.WebApi.Identity.Roles.Grants.put(this.selectedRoleOption(), this.id());
+            $.ajax({
+                url: url,
+                type: 'PUT'
+            })
+            .done((response: string, textStatus: string, xhr: JQueryXHR): void => {
+                App.flasher.flash(response);
+                this.pullRoleGrants()
+                .done((response: any[]): void => {
+                    this.loadRoleGrants(response);
+                    this._pullRoleOptions()
+                    .done((response: any[]): void => {
+                        this._loadRoleOptions(response);
+                    });
+                });
+            })
+            .fail((arg1: any, arg2, arg3): void => {
+                alert('fail');
+            });
+        }
+
+        revokeRole(roleId: number): void {
+            this.roleSpinner.start();
+            var url = App.Routes.WebApi.Identity.Roles.Grants.del(roleId, this.id());
+            $.ajax({
+                url: url,
+                type: 'DELETE'
+            })
+            .done((response: string, textStatus: string, xhr: JQueryXHR): void => {
+                App.flasher.flash(response);
+                this.pullRoleGrants()
+                .done((response: any[]): void => {
+                    this.loadRoleGrants(response);
+                    this._pullRoleOptions()
+                    .done((response: any[]): void => {
+                        this._loadRoleOptions(response);
+                    });
+                });
+            })
+            .fail((xhr: JQueryXHR, textStatus: string, errorThrown: string): void => {
+                alert('fail ' + xhr.responseText);
+            });
+        }
+    }
+
+    export class RoleGrant {
+        private _owner: SearchResult;
+        id: KnockoutObservableNumber;
+
+        constructor(values: any, owner: SearchResult) {
+            this._owner = owner;
+
+            // map api data to observables
+            ko.mapping.fromJS(values, {}, this);
+        }
+
+        revokeRole(): void {
+            this._owner.revokeRole(this.id());
         }
     }
 }
