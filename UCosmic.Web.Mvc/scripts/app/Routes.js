@@ -456,6 +456,9 @@ var App;
                 Activities.getLocations = function getLocations(activityId) {
                     return makeUrl('activities/' + activityId.toString() + '/locations');
                 }
+                Activities.getInstitutions = function getInstitutions(activityId) {
+                    return makeUrl('activities/' + activityId.toString() + '/institutions');
+                }
                 return Activities;
             })();
             WebApi.Activities = Activities;            
@@ -481,7 +484,7 @@ var App;
                 }
                 Establishments.created = created;
             })(Mvc.Establishments || (Mvc.Establishments = {}));
-            var Establishments = Mvc.Establishments;
+	    var Establishments = Mvc.Establishments;
             (function (Identity) {
                 (function (Users) {
                     function created(location) {
@@ -494,6 +497,14 @@ var App;
                 var Users = Identity.Users;
             })(Mvc.Identity || (Mvc.Identity = {}));
             var Identity = Mvc.Identity;
+            (function (Profile) {
+                function activityEdit(activityId) {
+                    var url = makeUrl('my/activity/');
+                    return url + activityId.toString();
+                }
+                Profile.activityEdit = activityEdit;
+            })(Mvc.Profile || (Mvc.Profile = {}));
+            var Profile = Mvc.Profile;
         })(Routes.Mvc || (Routes.Mvc = {}));
         var Mvc = Routes.Mvc;
     })(App.Routes || (App.Routes = {}));
