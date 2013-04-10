@@ -414,55 +414,73 @@ var App;
             })(WebApi.Employees || (WebApi.Employees = {}));
             var Employees = WebApi.Employees;
             (function (Activities) {
-                function get() {
-                    return makeUrl('activities/page');
+                function get(activityId) {
+                    var url = makeUrl('activities');
+                    if(activityId) {
+                        url += '/' + activityId;
+                    }
+                    return url;
                 }
                 Activities.get = get;
-                function getDocProxy() {
-                    return makeUrl('activities/docproxy');
+                function post() {
+                    return makeUrl('activities');
                 }
-                Activities.getDocProxy = getDocProxy;
-                var Locations = (function () {
-                    function Locations() { }
-                    Locations.get = function get() {
-                        return makeUrl('activities/locations');
+                Activities.post = post;
+                function put(activityId) {
+                    return makeUrl('activities/' + activityId);
+                }
+                Activities.put = put;
+                function del(activityId) {
+                    return makeUrl('activities/' + activityId);
+                }
+                Activities.del = del;
+                (function (Documents) {
+                    function get(activityId, documentId, activityMode) {
+                        var url = makeUrl('activities/' + activityId + '/documents');
+                        if(documentId) {
+                            url += '/' + documentId;
+                        } else {
+                            if(activityId) {
+                                url += '/?activityMode=' + activityMode;
+                            }
+                        }
+                        return url;
                     }
-                    return Locations;
-                })();
-                Activities.Locations = Locations;                
-                var Delete = (function () {
-                    function Delete() { }
-                    Delete.get = function get() {
-                        return makeUrl('activities/delete');
+                    Documents.get = get;
+                    function post(activityId) {
+                        return makeUrl('activities/' + activityId + '/documents');
                     }
-                    return Delete;
-                })();
-                Activities.Delete = Delete;                
+                    Documents.post = post;
+                    function put(activityId, documentId) {
+                        return makeUrl('activities/' + activityId + '/documents/' + documentId);
+                    }
+                    Documents.put = put;
+                    function del(activityId, documentId) {
+                        return makeUrl('activities/' + activityId + '/documents/' + documentId);
+                    }
+                    Documents.del = del;
+                    function validateFileExtensions(activityId) {
+                        return makeUrl('activities/' + activityId + '/documents/validate-upload-filetype');
+                    }
+                    Documents.validateFileExtensions = validateFileExtensions;
+                    (function (Thumbnail) {
+                        function get(activityId, documentId) {
+                            return makeUrl('activities/' + activityId + '/documents/' + documentId + '/thumbnail');
+                        }
+                        Thumbnail.get = get;
+                    })(Documents.Thumbnail || (Documents.Thumbnail = {}));
+                    var Thumbnail = Documents.Thumbnail;
+                })(Activities.Documents || (Activities.Documents = {}));
+                var Documents = Activities.Documents;
+                (function (Locations) {
+                    function get() {
+                        return makeUrl('activity-locations');
+                    }
+                    Locations.get = get;
+                })(Activities.Locations || (Activities.Locations = {}));
+                var Locations = Activities.Locations;
             })(WebApi.Activities || (WebApi.Activities = {}));
             var Activities = WebApi.Activities;
-            (function (Activity) {
-                function get() {
-                    return makeUrl('activity');
-                }
-                Activity.get = get;
-                function uploadDocument() {
-                    return makeUrl('activity/upload');
-                }
-                Activity.uploadDocument = uploadDocument;
-                function validateUploadFileTypeByExtension(activityId) {
-                    return makeUrl('activity/' + activityId.toString() + '/validate-upload-filetype');
-                }
-                Activity.validateUploadFileTypeByExtension = validateUploadFileTypeByExtension;
-                function getDocuments(activityValuesId) {
-                    return makeUrl('activity/' + activityValuesId.toString() + '/documents');
-                }
-                Activity.getDocuments = getDocuments;
-                function deleteDocument(activityDocumentId) {
-                    return makeUrl('activity/' + activityDocumentId.toString() + '/document');
-                }
-                Activity.deleteDocument = deleteDocument;
-            })(WebApi.Activity || (WebApi.Activity = {}));
-            var Activity = WebApi.Activity;
         })(Routes.WebApi || (Routes.WebApi = {}));
         var WebApi = Routes.WebApi;
         (function (Mvc) {
@@ -498,6 +516,14 @@ var App;
                 var Users = Identity.Users;
             })(Mvc.Identity || (Mvc.Identity = {}));
             var Identity = Mvc.Identity;
+            (function (Profile) {
+                function activityEdit(activityId) {
+                    var url = makeUrl('my/activity/');
+                    return url + activityId;
+                }
+                Profile.activityEdit = activityEdit;
+            })(Mvc.Profile || (Mvc.Profile = {}));
+            var Profile = Mvc.Profile;
         })(Routes.Mvc || (Routes.Mvc = {}));
         var Mvc = Routes.Mvc;
     })(App.Routes || (App.Routes = {}));

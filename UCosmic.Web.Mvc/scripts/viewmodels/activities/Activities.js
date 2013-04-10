@@ -31,17 +31,14 @@ var ViewModels;
                 activitiesSearchInput.orderBy = "";
                 activitiesSearchInput.pageNumber = 1;
                 activitiesSearchInput.pageSize = 10;
-                $.ajax({
-                    type: "POST",
-                    url: App.Routes.WebApi.Activities.get(),
-                    data: activitiesSearchInput,
-                    success: function (data, textStatus, jqXhr) {
+                $.get(App.Routes.WebApi.Activities.get(), activitiesSearchInput).done(function (data, textStatus, jqXHR) {
+ {
                         dataPact.resolve(data);
-                    },
-                    error: function (jqXhr, textStatus, errorThrown) {
+                    }
+                }).fail(function (jqXhr, textStatus, errorThrown) {
+ {
                         dataPact.reject(jqXhr, textStatus, errorThrown);
-                    },
-                    dataType: 'json'
+                    }
                 });
                 $.when(typesPact, locationsPact, dataPact).done(function (types, locations, data) {
                     _this.activityTypesList = types;
@@ -50,7 +47,7 @@ var ViewModels;
                         var augmentedDocumentModel = function (data) {
                             ko.mapping.fromJS(data, {
                             }, this);
-                            this.proxyImageSource = App.Routes.WebApi.Activities.getDocProxy() + data.id.toString();
+                            this.proxyImageSource = App.Routes.WebApi.Activities.Documents.Thumbnail.get(this.id(), data.id);
                         };
                         var mapping = {
                             'documents': {
@@ -70,7 +67,7 @@ var ViewModels;
             ActivityList.prototype.deleteActivityById = function (activityId) {
                 $.ajax({
                     type: "DELETE",
-                    url: App.Routes.WebApi.Activities.Delete.get() + activityId.toString(),
+                    url: App.Routes.WebApi.Activities.del(activityId),
                     success: function (data, textStatus, jqXHR) {
                         alert(textStatus);
                     },
@@ -113,11 +110,7 @@ var ViewModels;
                     url = element.attributes["href"].value;
                 }
                 if(url != null) {
-                    if(activityId == null) {
-                        location.href = url;
-                    } else {
-                        location.href = url + activityId.toString();
-                    }
+                    location.href = url;
                 }
             };
             ActivityList.prototype.getTypeName = function (id) {
