@@ -37,11 +37,11 @@ module App.Routes {
                     return makeUrl(url);
                 }
 
-                export function post () {
+                export function post() {
                     return makeUrl('users');
                 }
 
-                export function validateName (id?: number) {
+                export function validateName(id?: number) {
                     id = id ? id : 0;
                     var url = 'users/' + id + '/validate-name';
                     return makeUrl(url);
@@ -129,12 +129,12 @@ module App.Routes {
                 return get(establishmentId);
             }
 
-            export function validateCeebCode (establishmentId: number): string {
-                    return makeUrl('establishments/' + establishmentId + '/validate-ceeb-code');
+            export function validateCeebCode(establishmentId: number): string {
+                return makeUrl('establishments/' + establishmentId + '/validate-ceeb-code');
             }
 
-            export function validateUCosmicCode (establishmentId: number): string {
-                    return makeUrl('establishments/' + establishmentId + '/validate-ucosmic-code');
+            export function validateUCosmicCode(establishmentId: number): string {
+                return makeUrl('establishments/' + establishmentId + '/validate-ucosmic-code');
             }
 
             export class Names {
@@ -285,50 +285,69 @@ module App.Routes {
         }
 
         export module Activities {
-
-            export function get (): string {
-                return makeUrl('activities/page');
+            export function get (activityId?: number): string {
+                var url = makeUrl('activities');
+                if (activityId) {
+                    url += '/' + activityId;
+                }
+                return url;
             }
 
-            export function getDocProxy (): string {
-                    return makeUrl('activities/docproxy');
+            export function post(): string {
+                return makeUrl('activities');
             }
 
-            export class Locations {
-                static get (): string {
-                    return makeUrl('activities/locations');
+            export function put(activityId: number): string {
+                return makeUrl('activities/' + activityId);
+            }
+
+            export function del(activityId: number): string {
+                return makeUrl('activities/' + activityId);
+            }
+
+            export module Documents {
+                export function get (activityId: number, documentId?: number, activityMode?: string): string {
+                    var url = makeUrl('activities/' + activityId + '/documents');
+                    if (documentId) {
+                        url += '/' + documentId;
+                    }
+                    else if (activityId) {
+                        url += '/?activityMode=' + activityMode;
+                    }
+                    return url;
+                }
+
+                export function post(activityId: number): string {
+                    return makeUrl('activities/' + activityId + '/documents');
+                }
+
+                export function put(activityId: number, documentId: number): string {
+                    return makeUrl('activities/' + activityId + '/documents/' + documentId);
+                }
+
+                export function del(activityId: number, documentId: number): string {
+                    return makeUrl('activities/' + activityId + '/documents/' + documentId);
+                }
+
+                export function rename(activityId: number, documentId: number): string {
+                    return makeUrl('activities/' + activityId + '/documents/' + documentId + "/title");
+                }
+
+                export function validateFileExtensions(activityId: number): string {
+                    return makeUrl('activities/' + activityId + '/documents/validate-upload-filetype');
+                }
+
+                export module Thumbnail {
+                    export function get (activityId: number, documentId: number): string {
+                        return makeUrl('activities/' + activityId + '/documents/' + documentId + '/thumbnail');
+                    }
                 }
             }
 
-            export class Delete {
-                static get (): string {
-                    return makeUrl('activities/delete');
+            export module Locations {
+                export function get (): string {
+                    return makeUrl('activity-locations');
                 }
-            }
-
-
-        }
-
-        export module Activity {
-
-            export function get (): string {
-                return makeUrl('activity');
-            }
-
-            export function uploadDocument(): string {
-                return makeUrl('activity/upload');
-            }
-
-            export function validateUploadFileTypeByExtension(activityId: number): string {
-                return makeUrl('activity/' + activityId.toString() + '/validate-upload-filetype');
-            }
-
-            export function getDocuments(activityValuesId: number): string {
-                return makeUrl('activity/' + activityValuesId.toString() + '/documents');
-            }
-
-            export function deleteDocument(activityDocumentId: number): string {
-                return makeUrl('activity/' + activityDocumentId.toString() + '/document');
             }
         }
     }
@@ -361,12 +380,19 @@ module App.Routes {
                 }
             }
         }
-    }
 
-    //export module Params {
-    //    export class ImageResizeQuality {
-    //        static THUMBNAIL: string = 'thumbnail';
-    //        static HIGH: string = 'high';
-    //    }
-    //}
+        export module Profile {
+            export function activityEdit(activityId: string) {
+                var url = makeUrl('my/activity/');
+                return url + activityId;
+            }
+        }
+
+        //export module Params {
+        //    export class ImageResizeQuality {
+        //        static THUMBNAIL: string = 'thumbnail';
+        //        static HIGH: string = 'high';
+        //    }
+        //}
+    }
 }

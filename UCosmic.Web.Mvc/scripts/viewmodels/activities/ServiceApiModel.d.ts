@@ -5,6 +5,7 @@ module Service.ApiModels {
     export interface IEmployeeActivityType {
         id: number;
         type: string;
+        rank: number;
     }
 
     export interface IActivityLocation {
@@ -15,9 +16,19 @@ module Service.ApiModels {
         officialName: string;
     }
 
+    export interface IInstitution {
+        id: number;
+        officialName: string;
+    }
+
     export interface IObservableValuesActivityLocation {
         id: KnockoutObservableNumber;
         placeId: KnockoutObservableNumber;
+    }
+
+    export interface IObservableInstitution {
+        id: KnockoutObservableNumber;
+        officialName: KnockoutObservableString;
     }
 
     export interface IObservableActivityType {
@@ -76,7 +87,8 @@ module Service.ApiModels {
         number: KnockoutObservableNumber;
         entityId: KnockoutObservableString;     // guid converted to string
         modeText: KnockoutObservableString;
-        values: IObservableActivityValues;      // only values for modeText
+        //values: KnockoutObservableAny;      // only values for modeText
+        values: IObservableActivityValues;
     }
 
     export interface IActivityPage {

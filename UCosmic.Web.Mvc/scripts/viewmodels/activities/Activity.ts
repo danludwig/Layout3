@@ -5,6 +5,7 @@
 /// <reference path="../../ko/knockout.extensions.d.ts" />
 /// <reference path="../../ko/knockout.validation.d.ts" />
 /// <reference path="../../kendo/kendouiweb.d.ts" />
+/// <reference path="../../tinymce/tinymce.d.ts" />
 /// <reference path="../../oss/moment.d.ts" />
 /// <reference path="../../app/Routes.ts" />
 /// <reference path="../activities/ServiceApiModel.d.ts" />
@@ -15,13 +16,13 @@ module ViewModels.Activities {
     /* 
     */
     // ================================================================================
-	export class Activity implements Service.ApiModels.IObservableActivity, KnockoutValidationGroup {
+	export class Activity implements Service.ApiModels.IObservableActivity {
 
         /* Array of all locations offered in Country/Location multiselect. */
 	    locations: KnockoutObservableArray = ko.observableArray();
 
         /* Array of placeIds of selected locations. */
-	    selectedLocations: KnockoutObservableArray = ko.observableArray();
+        selectedLocations: KnockoutObservableArray = ko.observableArray();
 
         /* Array of activity types displayed as list of checkboxes */
 	    activityTypes: KnockoutObservableArray = ko.observableArray();
@@ -30,10 +31,19 @@ module ViewModels.Activities {
         addingTag: KnockoutObservableBool = ko.observable(false);
 
         /* Data bound to new tag textArea */
-	    newTag: KnockoutObservableString = ko.observable();
+        newTag: KnockoutObservableString = ko.observable();
 
         /* True if uploading document. */
         uploadingDocument: KnockoutObservableBool = ko.observable(false);
+
+        /* True if activity is on-going (no end date specified) */
+        isOnGoing: KnockoutObservableBool = ko.observable(false);
+
+        /* Old document name - used during document rename. */
+        previousDocumentTitle: string;
+
+        /* Initialization errors. */
+        inititializationErrors: string = "";
 
         /* IObservableActivity implemented */
         id: KnockoutObservableNumber;
@@ -42,14 +52,155 @@ module ViewModels.Activities {
         number: KnockoutObservableNumber;
         entityId: KnockoutObservableString;     // guid converted to string
         modeText: KnockoutObservableString;
+        //values: KnockoutObservableAny;          // only values for modeText
         values: Service.ApiModels.IObservableActivityValues;          // only values for modeText
 
+
         // --------------------------------------------------------------------------------
-        /* 
+        /*
         */
-        // --------------------------------------------------------------------------------                        
-        constructor(activityId: number) {
+        // --------------------------------------------------------------------------------
+        _initialize(activityId: number): void {
             this.id = ko.observable(activityId);
+        }
+
+        // --------------------------------------------------------------------------------
+        /*
+        */
+        // --------------------------------------------------------------------------------   
+        setupWidgets(fromDatePickerId: string,
+            toDatePickerId: string,
+            countrySelectorId: string,
+            uploadFileId: string,
+            newTagId: string): void {
+
+            $("#" + fromDatePickerId).kendoDatePicker();
+            $("#" + toDatePickerId).kendoDatePicker();
+
+            $("#" + countrySelectorId).kendoMultiSelect({
+                dataTextField: "officialName()",
+                dataValueField: "id()",
+                dataSource: this.locations(),
+                //values: activityViewModel.selectedLocations(), // This doesn't work.  See below.
+                change: (event: any) => { this.updateLocations(event.sender.value()); },
+                placeholder: "[Select Country/Location, Body of Water or Global]"
+            });
+
+            tinyMCE.init({
+                // Example content CSS (should be your site CSS)
+                //content_css : 'css/content.css',
+                content_css: "../../scripts/tinymce/css/content.css",
+                convert_urls: false,
+
+                // General options
+                theme: 'advanced',
+                mode: 'exact',
+                elements: 'tinymce',
+                height: '300',
+                width: '100%',
+                verify_html: true,
+                plugins: 'save,autosave,paste,searchreplace,table,nonbreaking',
+
+                // Theme options
+                theme_advanced_buttons1: 'save,undo,redo,restoredraft,|,formatselect,bold,italic,underline,|,link,unlink,|,bullist,numlist,|,outdent,indent,blockquote,|,sub,sup,charmap,code',
+                theme_advanced_buttons2: 'cut,copy,paste,pastetext,pasteword,|,search,replace,|,image,hr,nonbreaking,tablecontrols',
+                theme_advanced_buttons3: '',
+
+                theme_advanced_toolbar_location: 'top',
+                theme_advanced_toolbar_align: 'left',
+                theme_advanced_statusbar_location: 'bottom',
+                theme_advanced_resizing: true,
+                theme_advanced_resizing_max_height: '580',
+                theme_advanced_resize_horizontal: false,
+                theme_advanced_blockformats: 'h2,h3,p,blockquote',
+
+                save_enablewhendirty: true,
+                save_onsavecallback: 'onSavePluginCallback',
+
+                // Drop lists for link/image/media/template dialogs
+                template_external_list_url: 'lists/template_list.js',
+                external_link_list_url: 'lists/link_list.js',
+                external_image_list_url: 'lists/image_list.js',
+                media_external_list_url: 'lists/media_list.js'
+            });
+
+            $("#" + uploadFileId).kendoUpload({
+                multiple: false,
+                showFileList: false,
+                async: {
+                    saveUrl: App.Routes.WebApi.Activities.Documents.post(this.id()),
+                    autoUpload: true
+                },
+                select: (e: any): void => {
+                    var i = 0;
+                    var validFileType = true;
+                    while ((i < e.files.length) && validFileType) {
+                        var file = e.files[i];
+                        validFileType = this.validateUploadableFileTypeByExtension(this.id(), file.extension);
+                        if (!validFileType) {
+                            e.preventDefault();
+                        }
+                        i += 1;
+                    }
+                },
+                success: (e: any): void => {
+                    this.uploadingDocument(false);
+                    this.loadDocuments();
+                }
+            });
+
+            $("#" + newTagId).kendoAutoComplete({
+                minLength: 3,
+                placeholder: "[Enter tag]",
+                dataTextField: "officialName",
+                dataValueField: "id",
+                dataSource: new kendo.data.DataSource({
+                    serverFiltering: true,
+                    transport: {
+                        read: (options: any):void {
+                            $.ajax({
+                                url: App.Routes.WebApi.Establishments.get(),
+                               data: { keyword: options.data.filter.filters[0].value,
+                                        pageNumber: 1,
+                                        pageSize: 2147483647 /* C# Int32.Max */ },
+                               success: (results: any): void {
+                                   options.success(results.items);
+                               }
+                            });
+                        }
+                    }
+                })  
+            });
+        }
+
+        // --------------------------------------------------------------------------------
+        /*
+        */
+        // --------------------------------------------------------------------------------
+        setupValidation(): void {
+
+            ko.validation.rules['atLeast'] = {
+                validator: (val: any, otherVal: any): bool => {
+                    return  val.length >= otherVal;
+                },
+                message: 'At least {0} must be selected'
+            }
+
+            ko.validation.registerExtenders();
+
+            this.values.title.extend({ required: true, minLength: 1, maxLength: 64 });
+            this.values.locations.extend({ atLeast: 1 });
+            this.values.types.extend({ atLeast: 1 });
+
+            ko.validation.group(this.values);
+        }
+
+        // --------------------------------------------------------------------------------
+        /*
+        */
+        // --------------------------------------------------------------------------------  
+        constructor(activityId: number) {
+            this._initialize(activityId);
         }
 
         // --------------------------------------------------------------------------------
@@ -81,7 +232,7 @@ module ViewModels.Activities {
 
             $.ajax({
                     type: "GET",
-                     url: App.Routes.WebApi.Activity.get() + this.id().toString(),
+                     url: App.Routes.WebApi.Activities.get(this.id()),
                  success: function (data: Service.ApiModels.IActivityPage, textStatus: string, jqXhr: JQueryXHR): void 
                             { dataPact.resolve(data); },
                    error: function  (jqXhr: JQueryXHR, textStatus: string, errorThrown: string): void
@@ -89,13 +240,13 @@ module ViewModels.Activities {
             });
             
             // only process after all requests have been resolved
-            $.when(typesPact, locationsPact, dataPact)
+            $.when( typesPact, locationsPact, dataPact)
                 .done( (types: Service.ApiModels.IEmployeeActivityType[],
-                        locations: Service.ApiModels.IActivityLocation[],
+                        locations: Service.ApiModels.IActivityLocation[], 
                         data: Service.ApiModels.IObservableActivity): void => {
 
                     this.activityTypes = ko.mapping.fromJS(types);
-                    this.locations = ko.mapping.fromJS(locations);   
+                    this.locations = ko.mapping.fromJS(locations);
                                     
                     /* Although the MVC DateTime to JSON serializer will output an ISO compatible
                         string, we are not guarenteed that a browser's Date(string) or Date.parse(string)
@@ -105,16 +256,16 @@ module ViewModels.Activities {
                     {
                         var augmentedDocumentModel = function (data) {
                             ko.mapping.fromJS(data, {}, this);
-                            this.proxyImageSource = ko.observable(App.Routes.WebApi.Activities.getDocProxy() + data.id.toString());
+                            this.proxyImageSource = ko.observable(App.Routes.WebApi.Activities.Documents.Thumbnail.get(this.id(),data.id));
                         };
-                        
+
                        var mapping = {
-                            'documents': {
-                                create: function (options: any) {
-                                    return new augmentedDocumentModel(options.data); 
+                             'documents': {
+                                create: (options: any): KnockoutObservableAny => {
+                                    return new augmentedDocumentModel(options.data);
                                 }
                             },
-                            'startsOn':{
+                            'startsOn': {
                                 create: (options: any): KnockoutObservableDate => {
                                     return (options.data != null) ? ko.observable(moment(options.data).toDate()) : ko.observable();
                                 }
@@ -125,6 +276,38 @@ module ViewModels.Activities {
                                 }
                             }
                         };
+
+                       //var mapping = {
+                       //     'values': {
+                       //         create: (options: any): KnockoutObservableAny => {
+                       //             var augmentedDocumentModel = function (data) {
+                       //                 ko.mapping.fromJS(data, {}, this);
+                       //                 this.proxyImageSource = ko.observable(App.Routes.WebApi.Activities.Documents.Thumbnail.get(this.id(),data.id));
+                       //             };
+
+                       //             var mapping = {
+                       //                 'documents': {
+                       //                     create: (options: any): KnockoutObservableAny => {
+                       //                         return new augmentedDocumentModel(options.data);
+                       //                     }
+                       //                 },
+                       //                 'startsOn': {
+                       //                     create: (options: any): KnockoutObservableDate => {
+                       //                         return (options.data != null) ? ko.observable(moment(options.data).toDate()) : ko.observable();
+                       //                     }
+                       //                 },
+                       //                 'endsOn': {
+                       //                     create: (options: any): KnockoutObservableDate => {
+                       //                         return (options.data != null) ? ko.observable(moment(options.data).toDate()) : ko.observable();
+                       //                     }
+                       //                 }
+                       //             }
+
+                       //             var values = ko.mapping.fromJS(options.data, mapping);
+                       //             return ko.observable(values);
+                       //         }
+                       //     }
+                       // };
 
                         ko.mapping.fromJS(data, mapping, this);
                     }
@@ -148,6 +331,23 @@ module ViewModels.Activities {
 
             return deferred;
         }
+
+        // --------------------------------------------------------------------------------
+        /*  
+        */
+        // --------------------------------------------------------------------------------
+        save(item: any, event: any, mode: string): bool {
+            return true;
+        }
+ 
+        // --------------------------------------------------------------------------------
+        /*  
+        */
+        // --------------------------------------------------------------------------------
+        cancel(item: any, event: any, mode: string): bool {
+
+            return true;
+        } 
 
         // --------------------------------------------------------------------------------
         /*  
@@ -272,7 +472,7 @@ module ViewModels.Activities {
         */
         // --------------------------------------------------------------------------------
         updateLocations(locations: Array): void {
-            this.values.locations = ko.observableArray();
+            this.values.locations.removeAll();
             for (var i = 0; i < locations.length; i += 1) {
                 var location = ko.mapping.fromJS({ id: 0, placeId: locations[i] });
                 this.values.locations.push(location);
@@ -352,10 +552,10 @@ module ViewModels.Activities {
                     extension = extension.substring(1);
                 }
 
-                jQuery.ajax({
+                $.ajax({
                        async: false,
                         type: 'POST',
-                         url: App.Routes.WebApi.Activity.validateUploadFileTypeByExtension(activityId),
+                         url: App.Routes.WebApi.Activities.Documents.validateFileExtensions(activityId),
                         data: ko.toJSON(extension),
                     dataType: 'json',
                  contentType: 'application/json',
@@ -376,16 +576,16 @@ module ViewModels.Activities {
         */
         // --------------------------------------------------------------------------------
         loadDocuments(): void {
-            jQuery.ajax({
+            $.ajax({
                     type: 'GET',
-                     url: App.Routes.WebApi.Activity.getDocuments(this.values.id()),
+                     url: App.Routes.WebApi.Activities.Documents.get(this.id(),null,this.modeText()),
                 dataType: 'json',
                 success: (documents: any, textStatus: string, jqXhr: JQueryXHR): void {
 
                     /* TBD - This needs to be combined with the initial load mapping. */
                     var augmentedDocumentModel = function (data) {
                         ko.mapping.fromJS(data, {}, this);
-                        this.proxyImageSource = ko.observable(App.Routes.WebApi.Activities.getDocProxy() + data.id.toString());
+                        this.proxyImageSource = ko.observable(App.Routes.WebApi.Activities.Documents.Thumbnail.get(this.id(),data.id));
                     };
 
                     var mapping = {
@@ -412,10 +612,10 @@ module ViewModels.Activities {
         /*
         */
         // --------------------------------------------------------------------------------
-        deleteDocument(item: any, event: any): void {
-            jQuery.ajax({
+        deleteDocument(item: Service.ApiModels.IObservableActivityDocument, event: any): void {
+            $.ajax({
                     type: 'DELETE',
-                        url: App.Routes.WebApi.Activity.deleteDocument(item.id()),
+                        url: App.Routes.WebApi.Activities.Documents.del(this.id(),item.id()),
                 dataType: 'json',
                     success: (data: any, textStatus: string, jqXhr: JQueryXHR): void {
                         this.loadDocuments();
@@ -426,5 +626,57 @@ module ViewModels.Activities {
             });
         }
 
+        // --------------------------------------------------------------------------------
+        /*
+        */
+        // --------------------------------------------------------------------------------
+        startDocumentTitleEdit(item: Service.ApiModels.IObservableActivityDocument, event: any): void {
+            var textElement = event.target;
+            $(textElement).hide();
+            this.previousDocumentTitle = item.title();
+            var inputElement = $(textElement).siblings("#documentTitleInput")[0];
+            $(inputElement).show();
+            $(inputElement).focusout(event, (event: any): void => { this.endDocumentTitleEdit(item, event); } );
+            $(inputElement).keypress(event, (event: any): void => { if (event.which == 13) { inputElement.blur();  } } );
+        }
+
+        // --------------------------------------------------------------------------------
+        /*
+        */
+        // --------------------------------------------------------------------------------
+        endDocumentTitleEdit(item: Service.ApiModels.IObservableActivityDocument, event: any): void {
+            var inputElement = event.target;
+            $(inputElement).unbind("focusout");
+            $(inputElement).unbind("keypress");
+            $(inputElement).attr("disabled", "disabled");
+
+            $.ajax({
+                       type: 'PUT',
+                        url: App.Routes.WebApi.Activities.Documents.rename(this.id(), item.id()),
+                       data: ko.toJSON(item.title()),
+                contentType: 'application/json',
+                   dataType: 'json',
+                    success: (data: any, textStatus: string, jqXhr: JQueryXHR): void {
+                        $(inputElement).hide();
+                        $(inputElement).removeAttr("disabled");
+                        var textElement = $(inputElement).siblings("#documentTitle")[0];
+                        $(textElement).show();
+                    },
+                    error: (jqXhr: JQueryXHR, textStatus: string, errorThrown: string): void {
+                        item.title(this.previousDocumentTitle);
+                        $(inputElement).hide();
+                        $(inputElement).removeAttr("disabled");
+                        var textElement = $(inputElement).siblings("#documentTitle")[0];
+                        $(textElement).show();
+                        $("#documentRenameErrorDialog > #message")[0].innerText = jqXhr.responseText;
+                        $("#documentRenameErrorDialog").dialog({
+                            modal: true,
+                            resizable: false,
+                            width: 400,
+                            buttons: { Ok: function () { $(this).dialog("close"); } }
+                        });
+                    }
+            });
+        }
 	}
 }

@@ -1,4 +1,6 @@
-﻿@{
+﻿ @model UCosmic.Web.Mvc.Models.ActivityModel
+
+@{
     ViewBag.Title = "My International Activity";
 }
 
@@ -13,85 +15,17 @@
     <script type="text/javascript">
 
         $(function() {
-            var activityViewModel = new ViewModels.Activities.Activity(@Model);
-
+            var activityId = @Model.ActivityId;
+            var activityViewModel = new ViewModels.Activities.Activity(activityId);
             activityViewModel.load()
-                .done(function() {
-
-                    $("#fromDatePicker").kendoDatePicker();
-                    $("#toDatePicker").kendoDatePicker();
-
-                    $("#countrySelector").kendoMultiSelect({
-                        dataTextField: "officialName()",
-                        dataValueField: "id()",
-                        dataSource: activityViewModel.locations(),
-                        //values: activityViewModel.selectedLocations(), // This doesn't work.  See below.
-                        change: function(event) { activityViewModel.updateLocations(event.sender.value()); },
-                        placeholder: "[Select Country or Body of Water]"
-                    });
-
-                    tinyMCE.init({
-                        // Example content CSS (should be your site CSS)
-                        //content_css : 'css/content.css',
-                        content_css: "../../scripts/tinymce/css/content.css",
-                        convert_urls: false,
-
-                        // General options
-                        theme: 'advanced',
-                        mode: 'exact',
-                        elements: 'tinymce',
-                        height: '300',
-                        width: '100%',
-                        verify_html: true,
-                        plugins: 'save,autosave,paste,searchreplace,table,nonbreaking',
-
-                        // Theme options
-                        theme_advanced_buttons1: 'save,undo,redo,restoredraft,|,formatselect,bold,italic,underline,|,link,unlink,|,bullist,numlist,|,outdent,indent,blockquote,|,sub,sup,charmap,code',
-                        theme_advanced_buttons2: 'cut,copy,paste,pastetext,pasteword,|,search,replace,|,image,hr,nonbreaking,tablecontrols',
-                        theme_advanced_buttons3: '',
-
-                        theme_advanced_toolbar_location: 'top',
-                        theme_advanced_toolbar_align: 'left',
-                        theme_advanced_statusbar_location: 'bottom',
-                        theme_advanced_resizing: true,
-                        theme_advanced_resizing_max_height: '580',
-                        theme_advanced_resize_horizontal: false,
-                        theme_advanced_blockformats: 'h2,h3,p,blockquote',
-
-                        save_enablewhendirty: true,
-                        save_onsavecallback: 'onSavePluginCallback',
-
-                        // Drop lists for link/image/media/template dialogs
-                        template_external_list_url: 'lists/template_list.js',
-                        external_link_list_url: 'lists/link_list.js',
-                        external_image_list_url: 'lists/image_list.js',
-                        media_external_list_url: 'lists/media_list.js'
-                    });
-
-                    $("#uploadFile").kendoUpload({
-                        multiple: false,
-                        showFileList: false,
-                        async: {
-                            saveUrl: App.Routes.WebApi.Activity.uploadDocument() + activityViewModel.id(),
-                            autoUpload: true
-                        },
-                        select: function(e) {
-                            var i = 0;
-                            var validFileType = true;
-                            while ((i < e.files.length) && validFileType) {
-                                var file = e.files[i];
-                                validFileType = activityViewModel.validateUploadableFileTypeByExtension(activityViewModel.id(), file.extension);
-                                if (!validFileType) {
-                                    e.preventDefault();
-                                }
-                                i += 1;
-                            }
-                        },
-                        success: function(e) {
-                                activityViewModel.uploadingDocument(false);
-                                activityViewModel.loadDocuments();
-                            }
-                    });
+                .done(function () {
+                    activityViewModel.setupWidgets("fromDatePicker"
+                                                   ,"toDatePicker"
+                                                   ,"countrySelector"
+                                                   ,"uploadFile"
+                                                   ,"newTag");
+                    
+                    activityViewModel.setupValidation();
 
                     ko.applyBindings(activityViewModel, $("#activity-edit")[0]);
 
@@ -100,19 +34,15 @@
                     countrySelector.value(activityViewModel.selectedLocations());
 
                     var datePicker = $("#fromDatePicker").data("kendoDatePicker");
-                    datePicker.value(activityViewModel.values.startsOn());
+                    datePicker.value(activityViewModel.values().startsOn());
 
                     datePicker = $("#toDatePicker").data("kendoDatePicker");
-                    datePicker.value(activityViewModel.values.endsOn());
-
-                })  // activityViewModel.load.done
-                .fail(function(jqXhr, textStatus, errorThrown) {
+                    datePicker.value(activityViewModel.values().endsOn());
+                })
+                .fail(function (jqXhr, textStatus, errorThrown) {
                     alert(textStatus + "|" + errorThrown);
                 });
-// activityViewModel.load.fail
-
         });
-// function
 
     </script>
 }
@@ -125,140 +55,154 @@
 }
 
 <div class="content fixed to-top" data-current-module="home">
-	<div data-side-swiper="root">
-		<div data-side-swiper="deck">
-			<div data-side-swiper="on">
-				<div class="group">
-					<div class="on-left from-top" style="width: 100%;">
-						<header>
-						    <h1>@ViewBag.Title</h1>
+    <div data-side-swiper="root">
+        <div data-side-swiper="deck">
+            <div data-side-swiper="on">
+                <div class="group">
+                    <div id="activity-edit" class="on-left from-top" style="width: 100%;">
+				        
+                        <!-- BUTTONS -->
+                        <div style="margin-bottom: 32px" data-bind="template: { name: 'buttons-template'}"></div>
+
+                        <header>
+                            <h1>@ViewBag.Title</h1>
                             <span class="red badge" style="display: inline; vertical-align: middle" data-bind="visible: modeText().toLowerCase() == 'draft'">Draft</span>
-							<span class="on-right"><input type="button" value="Guide Me"/></span>
-						</header>
-						<div id="activity-edit" style="margin-bottom: 38px">
-							<table class="activity">
-								<tbody>
-									<tr>
-										<!-- TITLE -->
-										<td class="field-name">Title</td>
-										<td>
-										    <textarea rows="1" style="width: 750px; white-space: nowrap; overflow: hidden" placeholder="[Enter Title]" data-bind="text: values.title"></textarea>
-                                            <label class="required-field">*</label>
-										    <!-- <img src="~/images/icons/help/question-mark-24-blue.png" alt="Help" class="help-icon" data-bind="click: function (data, event) { help(data, event, null); }"/> -->
-										</td>
-									</tr>
-									<!-- COUNTRY -->
-									<tr>
-										<td class="field-name">Country/Location</td>
-									    <td>
-									        <select id="countrySelector" style="width: 750px" data-bind="selectedOptions: selectedLocations"></select>
-									    </td>
-									</tr>
-									<!-- TYPE -->
-									<tr>
-										<td class="field-name">Types</td>
-									    <td>
-									        <ul class="data-items" data-bind="template: { name: 'activity-types-template', foreach: activityTypes() }" />
-									    </td>
-									</tr>
-									<!-- FROM and TO DATES -->
-								    <tr>
-								        <td class="field-name">On/From</td>
-								        <td>
-								            <input id="fromDatePicker" style="height: 30px; vertical-align: middle" data-bind="value: values.startsOn"/>
-								            To&nbsp;
-								            <input id="toDatePicker" style="height: 30px; vertical-align: middle" data-bind="value: values.endsOn"/>
-								            <!-- <img src="~/images/icons/help/question-mark-24-blue.png" alt="Help" class="help-icon" data-bind="click: function (data, event) { help(data, event, null); }"/> -->
-								        </td>
-								    </tr>
-								    <!-- FUNDING -->
-								    <tr>
-								        <td class="field-name">Funding</td>
-								        <td>
-								            <input type="checkbox" style="margin-right: 4px; margin-left: 4px" data-bind="checked: values.wasExternallyFunded"/>
-								            <span>External</span>
-								            <input type="checkbox" style="margin-right: 4px; margin-left: 4px" data-bind="checked: values.wasInternallyFunded"/>
+                        </header>
+
+                        <div style="margin-bottom: 38px">
+                            <table class="activity">
+                                <tbody>
+                                    <tr>
+                                        <!-- TITLE -->
+                                        <td class="required-field-name">Title</td>
+                                        <td>
+                                            <textarea rows="1" style="width: 750px; white-space: nowrap; overflow: hidden" placeholder="[Enter Title]" data-bind="value: values().title"></textarea>
+                                            <!-- <img src="~/images/icons/help/question-mark-24-blue.png" alt="Help" class="help-icon" data-bind="click: function (data, event) { help(data, event, null); }"/> -->
+                                        </td>
+                                    </tr>
+                                    <!-- COUNTRY -->
+                                    <tr>
+                                        <td class="required-field-name">Country/Location</td>
+                                        <td>
+                                            <select id="countrySelector" style="width: 750px; overflow-y:auto" data-bind="selectedOptions: selectedLocations"></select>
+                                        </td>
+                                    </tr>
+                                    <!-- TYPE -->
+                                    <tr>
+                                        <td class="required-field-name">Types</td>
+                                        <td>
+                                            <ul class="data-items" data-bind="template: { name: 'activity-types-template', foreach: activityTypes() }" />
+                                        </td>
+                                    </tr>
+                                    <!-- FROM and TO DATES -->
+                                    <tr>
+                                        <td class="field-name" style="vertical-align: top">On/From</td>
+                                        <td>
+                                            <input id="fromDatePicker" style="height: 30px; vertical-align: middle" data-bind="value: values().startsOn"/>
+                                            <span>
+                                                &emsp;
+                                                <input id="ongoingCheckbox" type="checkbox" data-bind="checked: isOnGoing"/>
+                                                &nbsp;On-going&nbsp;
+                                            </span>
+                                            <span data-bind="visible: !isOnGoing()">
+                                                &nbsp;&nbsp;To&nbsp;
+                                                <input id="toDatePicker" style="height: 30px; vertical-align: middle" data-bind="value: values().endsOn"/>
+                                                <!-- <img src="~/images/icons/help/question-mark-24-blue.png" alt="Help" class="help-icon" data-bind="click: function (data, event) { help(data, event, null); }"/> -->  
+                                            </span>
+                                            <div class="example" style="margin-top: 8px">
+                                                <span>Enter dates as yyyy, mm/yyyy or use date picker.</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <!-- FUNDING -->
+                                    <tr>
+                                        <td class="field-name">Funding</td>
+                                        <td>
+                                            <input type="checkbox" style="margin-right: 4px; margin-left: 4px" data-bind="checked: values().wasExternallyFunded"/>
+                                            <span>External</span>
+                                            <input type="checkbox" style="margin-right: 4px; margin-left: 4px" data-bind="checked: values().wasInternallyFunded"/>
                                             <span>Internal</span>
-								        </td>
-								    </tr>
-								</tbody>
-							</table>
-							<!-- DESCRIPTION -->
-							<div style="margin-bottom: inherit">
-								<header style="margin-bottom: 4px">
-									<h2>Description</h2>
-									<!-- <img src="~/images/icons/help/question-mark-24-blue.png" alt="Help" style="width: 16px; height: 16px; float: right; margin-bottom: 3px"/> -->
-								</header>
-								<textarea id="tinymce"></textarea>
-							</div>
-							<!-- TAGS -->
-							<div style="margin-bottom: 32px">
-							    <header style="margin-bottom: 10px">
-							        <h2>
-							            <span>Tags</span>
-							            <img src="~/images/icons/plus/plus-24-green.png" alt="Add new tag" data-bind="click: function () { this.addingTag(true); }"/>
-							        </h2>
-							    </header>
-							    <div data-bind="visible: addingTag" style="width: 100%; margin-bottom: 16px">
-							        <textarea id="newTag" rows="1" style="width: 400px; white-space: nowrap; overflow: hidden" placeholder="[Enter Tag]" data-bind="value: newTag"></textarea>
-							        <input type="button" class="" value="Add" data-bind="click: function (item, event) { this.addTag(item, event); }"/>
-							        <input type="button" class="" value="Done" data-bind="click: function () { this.addingTag(false); }"/>
-							    </div>
-							    <div style="width: 100%; line-height: 150%; margin-bottom: inherit" data-bind="template: { name: 'tags-template', foreach: values.tags() }"></div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <!-- DESCRIPTION -->
+                            <div style="margin-bottom: inherit">
+                                <header style="margin-bottom: 4px">
+                                    <h2>Description</h2>
+                                    <!-- <img src="~/images/icons/help/question-mark-24-blue.png" alt="Help" style="width: 16px; height: 16px; float: right; margin-bottom: 3px"/> -->
+                                </header>
+                                <textarea id="tinymce"></textarea>
+                            </div>
+                            <!-- TAGS -->
+                            <div style="margin-bottom: 32px">
+                                <header style="margin-bottom: 10px">
+                                    <h2>
+                                        <span>Tags</span>
+                                        <img src="~/images/icons/plus/plus-24-green.png" alt="Add new tag" data-bind="click: function () { this.addingTag(true); }"/>
+                                    </h2>
+                                </header>
+                                <div data-bind="visible: addingTag" style="width: 100%; margin-bottom: 16px">
+                                    <input id="newTag" style="width: 400px; white-space: nowrap; overflow: hidden" data-bind="value: newTag"/>
+                                    <input type="button" class="" value="Add" data-bind="click: function (item, event) { this.addTag(item, event); }"/>
+                                    <input type="button" class="" value="Done" data-bind="click: function () { this.addingTag(false); }"/>
+                                </div>
+                                <div style="width: 100%; line-height: 150%; margin-bottom: inherit" data-bind="template: { name: 'tags-template', foreach: values().tags() }"></div>
                             </div>
 
-							<!-- DOCUMENTS -->
-						    <div style="width: 100%; margin-bottom: inherit">
-						        <header>
-						            <h2>
-						                <span>Documents</span>
-						                <img src="~/images/icons/plus/plus-24-green.png" alt="Add a new document" data-bind="click: function () { this.uploadingDocument(true); }"/>
-						            </h2>
-						        </header>
-						        <div data-bind="visible: uploadingDocument" style="margin-bottom: 16px">
-						            <input type="file" name="uploadFile" id="uploadFile"/>
+                            <!-- DOCUMENTS -->
+                            <div style="width: 100%; margin-bottom: inherit">
+                                <header>
+                                    <h2>
+                                        <span>Shared Documents</span>
+                                        <img src="~/images/icons/plus/plus-24-green.png" alt="Add a new document" data-bind="click: function () { this.uploadingDocument(true); }"/>
+                                    </h2>
+                                </header>
+                                <div data-bind="visible: uploadingDocument" style="margin-bottom: 16px">
+                                    <input type="file" name="uploadFile" id="uploadFile"/>
                                 </div>
-						        <div>
-						            <table class="data">
-						                <thead>
-						                    <tr>
-						                        <th style="width: 10%; text-align: center">Preview</th>
-						                        <th style="width: 60%">Title</th>
-						                        <th style="width: 10%; text-align: center">Type</th>
-						                        <th style="width: 10%; text-align: center">Size</th>
-                                                <th style="width: 5%; text-align: center">Hide</th>
-						                        <th style="width: 5%"></th>
-						                    </tr>
-						                </thead>
-						                <tbody data-bind="template: { name: 'activity-document-template', foreach: values.documents }"></tbody>
-						            </table>
-						        </div>
-						    </div>
+                                <div>
+                                    <table class="data">
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 10%; text-align: center">Preview</th>
+                                                <th style="width: 65%">Title</th>
+                                                <th style="width: 10%; text-align: center">Type</th>
+                                                <th style="width: 10%; text-align: center">Size</th>
+                                                <!--<th style="width: 5%; text-align: center">Hide</th>-->
+                                                <th style="width: 5%"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody data-bind="template: { name: 'activity-document-template', foreach: values().documents }"></tbody>
+                                    </table>
+                                </div>
+                            </div>
                             
-						    <!-- BUTTONS -->
-						    <div style="margin-bottom: 32px">
-						        <span>
-						            <input type="button" value="Save as Draft"/>
-						            <input type="button" value="Save as Final"/>
-						            <input type="button" value="Cancel" style="float: right"/>
-						        </span>
-						    </div>
-                            
-						    <div style="margin-bottom: 32px">
-						        <a href="#">Request my profile be deleted</a>
-						    </div>
+                            <!-- BUTTONS -->
+                            <div style="margin-bottom: 32px" data-bind="template: { name: 'buttons-template'}"></div>
 
-						    <!-- LAST UPDATED -->
-							<div style="width: 33%; height: 1.5em; border-top: 1px; border-style: solid">
-								<span style="font-size:smaller; color:slategray">Last updated <label id="last-updated-date">00/00/0000</label> by <label id="last-updated-name">John Doe</label></span>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
+                            <!-- LAST UPDATED -->
+                            <div style="width: 50%; height: 1.5em; border-top: 1px; border-style: solid">
+                                <span style="font-size:smaller; color:slategray">
+                                    <span>Last updated</span>
+                                    <label id="last-updated-date" data-bind="text: moment(whenLastUpdated()).toDate()"></label>
+                                    <span> by </span>
+                                    <label id="last-updated-name" data-bind="text: whoLastUpdated()"></label>
+                                </span>
+                            </div>
+                        </div>                      
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+                  
+<!-- JQUERY DIALOGS -->
+<div id="documentRenameErrorDialog" title="Error Renaming Document">
+    <span id="message" style="float: left"></span>
+</div>  
 
 
 <!-- KNOCKOUT TEMPLATES -->
@@ -277,14 +221,21 @@
 </script>
 
 <script type="text/html" id="activity-document-template">
-    <tr class="hover-hilite">
+    <tr class="hover-hilite" style="white-space: normal">
         <!-- Preview -->
         <td style="text-align: center">
-            <img data-bind="attr: { src: proxyImageSource, width: proxyWidth, height: proxyHeight }">
+            <img alt="thumbnail" data-bind="attr: { src: proxyImageSource, width: proxyWidth, height: proxyHeight }">
         </td>
         <!-- Title -->
         <td>
-            <span data-bind="text: title"></span>
+            <span style="display: inline"
+                  id="documentTitle"
+                  data-bind="text: title, click: function (item, event) { $parent.startDocumentTitleEdit(item, event); }">
+            </span>
+            <input type="text"
+                   id="documentTitleInput"
+                   style="display: none"
+                   data-bind="value: title"/>
         </td>
         <!-- Type -->
         <td style="text-align: center">
@@ -295,9 +246,9 @@
             <span data-bind="text: size"></span>
         </td>
         <!-- Visible -->
-        <td style="text-align: center">
-            <input type="checkbox" data-bind="checked: !visible"/>
-        </td>
+        <!--<td style="text-align: center">
+                <input type="checkbox" data-bind="checked: !visible"/>
+            </td>-->
         <!-- Remove Button -->
         <td style="text-align: center; vertical-align: middle">
             <a href="#" title="Remove document" data-bind="click: function (item, event) { $parent.deleteDocument(item, event, 0); }, clickBubble: false">
@@ -305,4 +256,13 @@
             </a>
         </td>
     </tr>
+</script>
+
+<script type="text/html" id="buttons-template">
+    <span>
+        <input type="button" value="Save as Draft" data-bind="click: function (item, event) { save(item, event, 'Draft'); }"/>
+        <input type="button" value="Save as Final" data-bind="click: function (item, event) { save(item, event, 'Final'); }"/>
+        <input type="button" value="Guide Me" style="margin-left: 50px"/>
+        <input type="button" value="Cancel" style="float: right" data-bind="click: function (item, event) { cancel(item, event); }"/>
+    </span>
 </script>

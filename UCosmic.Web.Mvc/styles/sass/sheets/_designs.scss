@@ -46,21 +46,37 @@ body {
 
         td.field-name {
             padding-left: 4px;
-						padding-right: 4px;
-						padding-top: 16px;
-						padding-bottom: 16px;
-						text-align: right;
+            padding-right: 4px;
+            padding-top: 16px;
+            padding-bottom: 16px;
+            text-align: right;
             vertical-align: middle;
         }
 
-				td {
+        td.required-field-name {
             padding-left: 4px;
-						padding-right: 4px;
-						padding-top: 16px;
-						padding-bottom: 16px;
-						text-align: left;
+            padding-right: 4px;
+            padding-top: 16px;
+            padding-bottom: 16px;
+            text-align: right;
             vertical-align: middle;
-				}
+        }
+
+        td.required-field-name::after {
+            content: "*";
+            font-size: large;
+            vertical-align: text-top;
+            color: #F00;
+        }
+
+        td {
+            padding-left: 4px;
+            padding-right: 4px;
+            padding-top: 16px;
+            padding-bottom: 16px;
+            text-align: left;
+            vertical-align: middle;
+        }
     }
 
     ul.data, ol.data {
@@ -310,13 +326,6 @@ body {
         -ms-text-overflow: ellipsis;
     }
 
-    .required-field {
-        font-family: sans-serif;
-        font-size: xx-large;
-        vertical-align: text-top;
-        color: $branded-badge-dark1-bg-color;
-    }
-
     .help-icon {
         width: 16px;
         height: 16px;
@@ -340,5 +349,10 @@ body {
 
     small {
         font-size: smaller;
+    }
+
+    .example {
+        font-size: smaller;
+        color: #777;
     }
 }

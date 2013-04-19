@@ -73,16 +73,13 @@ module ViewModels.Activities {
             activitiesSearchInput.pageNumber = 1;
             activitiesSearchInput.pageSize = 10;
 
-            $.ajax({
-                    type: "POST",
-                     url: App.Routes.WebApi.Activities.get(),
-                    data: activitiesSearchInput,
-                 success: function (data: Service.ApiModels.IActivityPage, textStatus: string, jqXhr: JQueryXHR): void 
-                            { dataPact.resolve(data); },
-                   error: function  (jqXhr: JQueryXHR, textStatus: string, errorThrown: string): void
-                            { dataPact.reject(jqXhr, textStatus, errorThrown); },
-                dataType: 'json'
-            });
+            $.get(App.Routes.WebApi.Activities.get(), activitiesSearchInput)
+                .done((data: Service.ApiModels.IEmployeeActivityType[], textStatus: string, jqXHR: JQueryXHR): void => {
+                    { dataPact.resolve(data); }
+                })
+                .fail((jqXhr: JQueryXHR, textStatus: string, errorThrown: string): void => {
+                    { dataPact.reject(jqXhr, textStatus, errorThrown); }
+                });
             
             // only process after all requests have been resolved
             $.when(typesPact, locationsPact, dataPact)
@@ -96,7 +93,7 @@ module ViewModels.Activities {
                     {
                         var augmentedDocumentModel = function (data) {
                             ko.mapping.fromJS(data, {}, this);
-                            this.proxyImageSource = App.Routes.WebApi.Activities.getDocProxy() + data.id.toString();
+                            this.proxyImageSource = App.Routes.WebApi.Activities.Documents.Thumbnail.get(this.id(),data.id);
                         };
 
                         var mapping = {
@@ -126,7 +123,7 @@ module ViewModels.Activities {
         deleteActivityById(activityId: number): void {
             $.ajax({
                 type: "DELETE",
-                url: App.Routes.WebApi.Activities.Delete.get() + activityId.toString(),
+                url: App.Routes.WebApi.Activities.del(activityId),
                 success: function (data: Service.ApiModels.IActivityPage, textStatus: string, jqXHR: JQueryXHR): void
                     {
                         alert(textStatus);
@@ -179,12 +176,7 @@ module ViewModels.Activities {
             }
 
             if (url != null) {
-                if (activityId == null) {
-                    location.href = url;
-                }
-                else {
-                    location.href = url + activityId.toString();
-                }
+                location.href = url;
             }
         }
         
@@ -263,9 +255,16 @@ module ViewModels.Activities {
             var formattedTypes: string = "";
             var location: Service.ApiModels.IActivityLocation;
 
-            for (var i = 0; i < types.length; i += 1) {
-                if (i > 0) { formattedTypes += ", "; }
-                formattedTypes += this.getTypeName(types[i].typeId());
+            /* ----- Assemble in sorted order ----- */
+            for (var i = 0; i < this.activityTypesList.length; i += 1) {
+                for (var j = 0; j < types.length; j += 1)
+                {
+                    if (types[j].typeId() == this.activityTypesList[i].id)
+                    {
+                        if (formattedTypes.length > 0) { formattedTypes += "; "; }
+                        formattedTypes += this.activityTypesList[i].type;
+                    }
+                }
             }
 
             return formattedTypes;

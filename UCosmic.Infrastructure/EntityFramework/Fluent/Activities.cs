@@ -19,6 +19,7 @@ namespace UCosmic.EntityFramework
                 .WillCascadeOnDelete(true);
 
             Property(p => p.ModeText).HasColumnName("Mode").IsRequired().HasMaxLength(20);
+            Property(p => p.EditSourceId).IsOptional();
 
             Ignore(p => p.Mode);
         }
@@ -120,6 +121,7 @@ namespace UCosmic.EntityFramework
                 .HasForeignKey(p => p.ImageId);
 
             Property(p => p.ModeText).HasColumnName("Mode").IsRequired().HasMaxLength(ActivityDocumentConstraints.ModeTextMaxLength);
+            Property(p => p.Title).IsRequired().HasMaxLength(ActivityDocumentConstraints.MaxTitleLength);
 
             Ignore(p => p.Mode);
         }

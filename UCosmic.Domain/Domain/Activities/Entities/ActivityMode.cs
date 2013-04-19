@@ -4,7 +4,6 @@
     {
         Draft = 1,
         Public = 2,
-        Protected = 3,
-        AutoSave = 4
+        Protected = 3
     }
 }
