@@ -2,7 +2,16 @@
     ViewBag.Title = "Configure";
 }
 
-<div class="content fixed to-top" data-current-module="agreements">
+@section scripts
+{
+    <script type="text/javascript">
+        var repModuleSettingsViewModel = new ViewModels.Representatives.RepModuleSettings();
+        ko.applyBindings(repModuleSettingsViewModel, $('data-current-module=representatives')[0]);
+        repModuleSettingsViewModel.sammy.run();
+    </script>
+}
+
+<div class="content fixed to-top" data-current-module="representatives">
     <div data-side-swiper="root">
         <div data-side-swiper="deck">
             <div id="all" data-side-swiper="on">
