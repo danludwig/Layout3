@@ -42,6 +42,7 @@ var ViewModels;
                     theme_advanced_buttons1: 'save,undo,redo,restoredraft,|,formatselect,bold,italic,underline,|,link,unlink,|,bullist,numlist,|,outdent,indent,blockquote,|,sub,sup,charmap,code',
                     theme_advanced_buttons2: 'cut,copy,paste,pastetext,pasteword,|,search,replace,|,image,hr,nonbreaking,tablecontrols',
                     theme_advanced_buttons3: '',
+                    theme_advanced_font_sizes: "10px,12px,14px,16px,24px",
                     theme_advanced_toolbar_location: 'top',
                     theme_advanced_toolbar_align: 'left',
                     theme_advanced_statusbar_location: 'bottom',
@@ -144,7 +145,7 @@ var ViewModels;
                 var dataPact = $.Deferred();
                 $.ajax({
                     type: "GET",
-                    url: App.Routes.WebApi.Activities.get(this.id()),
+                    url: App.Routes.WebApi.Activities.getEdit(this.id()),
                     success: function (data, textStatus, jqXhr) {
                         dataPact.resolve(data);
                     },
@@ -192,11 +193,70 @@ var ViewModels;
                 });
                 return deferred;
             };
+            Activity.prototype.autoSave = function (item, event) {
+                var model = ko.mapping.toJS(this);
+                model.values.startsOn = moment(model.values.startsOn).format();
+                model.values.endsOn = moment(model.values.endsOn).format();
+                $.ajax({
+                    async: false,
+                    type: 'PUT',
+                    url: App.Routes.WebApi.Activities.put(item.id()),
+                    data: model,
+                    dataType: 'json',
+                    success: function (data, textStatus, jqXhr) {
+                    },
+                    error: function (jqXhr, textStatus, errorThrown) {
+                        alert(textStatus + "; " + errorThrown);
+                    }
+                });
+                ;
+                location.href = App.Routes.Mvc.My.Profile.get();
+            };
             Activity.prototype.save = function (item, event, mode) {
-                return true;
+                this.autoSave(item, event);
+                $.ajax({
+                    async: false,
+                    type: 'PUT',
+                    url: App.Routes.WebApi.Activities.putEdit(item.id()),
+                    data: ko.toJSON(mode),
+                    dataType: 'json',
+                    contentType: 'application/json',
+                    success: function (data, textStatus, jqXhr) {
+                    },
+                    error: function (jqXhr, textStatus, errorThrown) {
+                        alert(textStatus + "; " + errorThrown);
+                    }
+                });
+                ;
+                location.href = App.Routes.Mvc.My.Profile.get();
             };
             Activity.prototype.cancel = function (item, event, mode) {
-                return true;
+                $("#cancelConfirmDialog").dialog({
+                    modal: true,
+                    resizable: false,
+                    width: 450,
+                    buttons: {
+                        "Do not cancel": function () {
+                            $(this).dialog("close");
+                        },
+                        "Cancel and lose changes": function () {
+                            $.ajax({
+                                async: false,
+                                type: 'DELETE',
+                                url: App.Routes.WebApi.Activities.del(item.id()),
+                                dataType: 'json',
+                                contentType: 'application/json',
+                                success: function (data, textStatus, jqXhr) {
+                                },
+                                error: function (jqXhr, textStatus, errorThrown) {
+                                    alert(textStatus + "; " + errorThrown);
+                                }
+                            });
+                            $(this).dialog("close");
+                            location.href = App.Routes.Mvc.My.Profile.get();
+                        }
+                    }
+                });
             };
             Activity.prototype.addActivityType = function (activityTypeId) {
                 var existingIndex = this.getActivityTypeIndexById(activityTypeId);
@@ -247,9 +307,9 @@ var ViewModels;
                     },
                     write: function (checked) {
                         if(checked) {
-                            this.addActivityType(this.activityTypes()[activityTypeIndex].id());
+                            _this.addActivityType(_this.activityTypes()[activityTypeIndex].id());
                         } else {
-                            this.removeActivityType(this.activityTypes()[activityTypeIndex].id());
+                            _this.removeActivityType(_this.activityTypes()[activityTypeIndex].id());
                         }
                     },
                     owner: this

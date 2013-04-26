@@ -10,6 +10,7 @@ namespace UCosmic.Domain.Activities
     {
         public IPrincipal Principal { get; private set; }
         public int Id { get; private set; }
+        public bool NoCommit { get; set; }
 
         public DeleteActivityDocument(IPrincipal principal, int id)
         {
@@ -93,7 +94,11 @@ namespace UCosmic.Domain.Activities
 
             //_entities.Create(audit);
             _entities.Purge(activityDocument);
-            _unitOfWork.SaveChanges();
+
+            if (!command.NoCommit)
+            {
+                _unitOfWork.SaveChanges();
+            }
             //_eventProcessor.Raise(new EstablishmentChanged());
         }
     }

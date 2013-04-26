@@ -7,8 +7,8 @@ namespace UCosmic.Domain.Activities
 {
     public class DeleteActivityLocation
     {
-        public IPrincipal Principal { get; protected internal set; }
-        public int Id { get; protected internal set; }
+        public IPrincipal Principal { get; protected set; }
+        public int Id { get; protected set; }
         public bool NoCommit { get; set; }
 
         public DeleteActivityLocation(IPrincipal principal, int id)
@@ -26,7 +26,7 @@ namespace UCosmic.Domain.Activities
             CascadeMode = CascadeMode.StopOnFirstFailure;
 
             RuleFor(x => x.Principal)
-                .MustOwnActivityDocument(entities, x => x.Id)
+                .MustOwnActivityLocation(entities, x => x.Id)
                 .WithMessage(MustOwnActivityLocation<object>.FailMessageFormat, x => x.Principal.Identity.Name, x => x.Id);
 
             RuleFor(x => x.Id)
@@ -35,7 +35,7 @@ namespace UCosmic.Domain.Activities
                     .WithMessage(MustBePositivePrimaryKey.FailMessageFormat, x => "ActivityLocation id", x => x.Id)
 
                 // id must exist in the database
-                .MustFindActivityDocumentById(entities)
+                .MustFindActivityLocationById(entities)
                     .WithMessage(MustFindActivityLocationById.FailMessageFormat, x => x.Id)
             ;
         }

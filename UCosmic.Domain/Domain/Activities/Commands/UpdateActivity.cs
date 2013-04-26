@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Security.Principal;
 using FluentValidation;
+using UCosmic.Domain.People;
 
 namespace UCosmic.Domain.Activities
 {
@@ -11,17 +13,19 @@ namespace UCosmic.Domain.Activities
     {
         public IPrincipal Principal { get; protected set; }
         public int Id { get; protected set; }
-        public string ModeText { get; set; }
+        public DateTime UpdatedOn { get; protected set; }
+        public string ModeText { get; protected set; }
+        public int Number { get; set; }
         public ActivityValues Values { get; set; }
-        public DateTime UpdatedOn { get; set; }
-        public IPrincipal UpdatedBy { get; set; }
         public bool NoCommit { get; set; }
 
-        public UpdateActivity(IPrincipal principal, int id)
+        public UpdateActivity(IPrincipal principal, int id, DateTime updatedOn, string modeText)
         {
             if (principal == null) { throw new ArgumentNullException("principal"); }
             Principal = principal;
             Id = id;
+            UpdatedOn = updatedOn;
+            ModeText = modeText;
         }
     }
 
@@ -32,7 +36,7 @@ namespace UCosmic.Domain.Activities
             CascadeMode = CascadeMode.StopOnFirstFailure;
 
             RuleFor(x => x.Principal)
-                .MustOwnActivityDocument(entities, x => x.Id)
+                .MustOwnActivity(entities, x => x.Id)
                 .WithMessage(MustOwnActivity<object>.FailMessageFormat, x => x.Principal.Identity.Name, x => x.Id);
 
             RuleFor(x => x.Id)
@@ -41,7 +45,7 @@ namespace UCosmic.Domain.Activities
                 .WithMessage(MustBePositivePrimaryKey.FailMessageFormat, x => "Activity id", x => x.Id)
 
                 // id must exist in the database
-                .MustFindActivityDocumentById(entities)
+                .MustFindActivityById(entities)
                 .WithMessage(MustFindActivityById.FailMessageFormat, x => x.Id);
         }
     }
@@ -63,26 +67,31 @@ namespace UCosmic.Domain.Activities
             if (command == null) throw new ArgumentNullException("command");
 
             /* Retrieve the activity to update. */
-            var activity = _entities.Get<Activity>().Single(a => a.RevisionId == command.Id);
+            var target = _entities.Get<Activity>().Single(a => a.RevisionId == command.Id);
 
-            /* Retrieve the activty values of the same mode. */
-            var activityValues = _entities.Get<ActivityValues>()
-                                    .Single(v => (v.RevisionId == command.Id) && (v.ModeText == command.ModeText));
+            /* Retrieve the target activty values of the same mode. */
+            var targetActivityValues = _entities.Get<ActivityValues>()
+                                            .Single(v => (v.ActivityId == target.RevisionId) && 
+                                                         (v.ModeText == command.ModeText));
+
 
             /* If target fields equal new field values, we do not proceed. */
-            if ((activity.ModeText == command.ModeText) &&
-                (activityValues.Equals(command.Values)))
+            if ( (target.ModeText == command.ModeText) &&
+                 (targetActivityValues.Equals(command.Values)) )
             {
                 return;
             }
 
             /* Update fields */
-            activity.Mode = command.ModeText.AsEnum<ActivityMode>();
-            activity.UpdatedOnUtc = command.UpdatedOn;
-            activity.UpdatedByPrincipal = command.UpdatedBy.Identity.Name;
+            target.ModeText = command.ModeText;
+            target.Number = command.Number;
+            target.UpdatedOnUtc = command.UpdatedOn.ToUniversalTime();
+            target.UpdatedByPrincipal = command.Principal.Identity.Name;
 
             /* Update activity values (for this mode) */
-            var updateActivityValuesCommand = new UpdateActivityValues(command.Principal, activityValues.RevisionId)
+            var updateActivityValuesCommand = new UpdateActivityValues(command.Principal,
+                                                                       targetActivityValues.RevisionId,
+                                                                       command.UpdatedOn)
             {
                 Title = command.Values.Title,
                 Content = command.Values.Content,
@@ -91,12 +100,10 @@ namespace UCosmic.Domain.Activities
                 Mode = command.Values.Mode,
                 WasExternallyFunded = command.Values.WasExternallyFunded,
                 WasInternallyFunded = command.Values.WasInternallyFunded,
-                Locations = command.Values.Locations,
-                Types = command.Values.Types,
-                Tags = command.Values.Tags,
-                Documents = command.Values.Documents,
-                UpdatedOn = command.UpdatedOn,
-                UpdatedBy = command.UpdatedBy,
+                Locations = command.Values.Locations ?? new Collection<ActivityLocation>(),
+                Types = command.Values.Types ?? new Collection<ActivityType>(),
+                Tags = command.Values.Tags ?? new Collection<ActivityTag>(),
+                Documents = command.Values.Documents ?? new Collection<ActivityDocument>(),
                 NoCommit = true
             };
 
@@ -104,7 +111,7 @@ namespace UCosmic.Domain.Activities
 
             if (!command.NoCommit)
             {
-                _entities.Update(activity);
+                _entities.Update(target);
             }
         }
     }

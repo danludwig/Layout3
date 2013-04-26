@@ -66,10 +66,10 @@ var ViewModels;
             };
             ActivityList.prototype.deleteActivityById = function (activityId) {
                 $.ajax({
+                    async: false,
                     type: "DELETE",
                     url: App.Routes.WebApi.Activities.del(activityId),
                     success: function (data, textStatus, jqXHR) {
-                        alert(textStatus);
                     },
                     error: function (jqXHR, textStatus, errorThrown) {
                         alert(textStatus);
@@ -86,8 +86,9 @@ var ViewModels;
                         {
                             text: "Yes, confirm delete",
                             click: function () {
-                                viewModel.deleteActivityById(data.revisionId());
+                                viewModel.deleteActivityById(data.id());
                                 $(this).dialog("close");
+                                location.href = App.Routes.Mvc.My.Profile.get();
                             }
                         }, 
                         {
@@ -101,7 +102,30 @@ var ViewModels;
                 });
             };
             ActivityList.prototype.editActivity = function (data, event, activityId) {
-                var element = event.srcElement;
+                $.ajax({
+                    type: "GET",
+                    url: App.Routes.WebApi.Activities.getEditState(activityId),
+                    success: function (editState, textStatus, jqXHR) {
+                        if(editState.isInEdit) {
+                            $("#activityBeingEditedDialog").dialog({
+                                dialogClass: 'jquery-ui',
+                                width: 'auto',
+                                resizable: false,
+                                modal: true,
+                                buttons: {
+                                    Ok: function () {
+                                        $(this).dialog("close");
+                                        return;
+                                    }
+                                }
+                            });
+                        }
+                    },
+                    error: function (jqXHR, textStatus, errorThrown) {
+                        alert(textStatus + "|" + errorThrown);
+                    }
+                });
+                var element = event.target;
                 var url = null;
                 while((element != null) && (element.nodeName != 'TR')) {
                     element = element.parentElement;
@@ -112,6 +136,18 @@ var ViewModels;
                 if(url != null) {
                     location.href = url;
                 }
+            };
+            ActivityList.prototype.newActivity = function (data, event) {
+                $.ajax({
+                    type: "POST",
+                    url: App.Routes.WebApi.Activities.post(),
+                    success: function (newActivityId, textStatus, jqXHR) {
+                        location.href = App.Routes.Mvc.My.Profile.activityEdit(newActivityId);
+                    },
+                    error: function (jqXHR, textStatus, errorThrown) {
+                        alert(textStatus + "|" + errorThrown);
+                    }
+                });
             };
             ActivityList.prototype.getTypeName = function (id) {
                 var typeName = "";

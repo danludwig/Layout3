@@ -34,7 +34,7 @@ namespace UCosmic.Web.Mvc.ApiControllers
         private readonly IHandleCommands<DeleteActivityDocument> _deleteActivityDocument;
         private readonly IHandleCommands<RenameActivityDocument> _renameActivityDocument;
         private readonly IHandleCommands<CopyDeepActivity> _copyDeepActivity;
-        private readonly IHandleCommands<CreateMyNewActivity> _createActivity;
+        private readonly IHandleCommands<CreateDeepActivity> _createDeepActivity;
         private readonly IHandleCommands<DeleteActivity> _deleteActivity;
         private readonly IHandleCommands<UpdateActivity> _updateActivity;
 
@@ -48,7 +48,7 @@ namespace UCosmic.Web.Mvc.ApiControllers
                                   , IHandleCommands<DeleteActivityDocument> deleteActivityDocument 
                                   , IHandleCommands<RenameActivityDocument> renameActivityDocument
                                   , IHandleCommands<CopyDeepActivity> copyDeepActivity
-                                  , IHandleCommands<CreateMyNewActivity> createActivity
+                                  , IHandleCommands<CreateDeepActivity> createDeepActivity
                                   , IHandleCommands<DeleteActivity> deleteActivity
                                   , IHandleCommands<UpdateActivity> updateActivity )
         {
@@ -62,7 +62,7 @@ namespace UCosmic.Web.Mvc.ApiControllers
             _deleteActivityDocument = deleteActivityDocument;
             _renameActivityDocument = renameActivityDocument;
             _copyDeepActivity = copyDeepActivity;
-            _createActivity = createActivity;
+            _createDeepActivity = createDeepActivity;
             _deleteActivity = deleteActivity;
             _updateActivity = updateActivity;
         }
@@ -130,11 +130,9 @@ namespace UCosmic.Web.Mvc.ApiControllers
                 {
                 /* There's no "in progress edit" record, so we make a copy of the
                      * activity and set it to edit mode. */
-                    var copyDeepActivityCommand = new CopyDeepActivity
-                    {
-                        Id = activity.RevisionId,
-                        EditSourceId = activity.RevisionId
-                    };
+                    var copyDeepActivityCommand = new CopyDeepActivity(activity.RevisionId,
+                                                                       activity.Mode,
+                                                                       activity.RevisionId);
 
                     _copyDeepActivity.Handle(copyDeepActivityCommand);
 
@@ -158,19 +156,45 @@ namespace UCosmic.Web.Mvc.ApiControllers
 
         // --------------------------------------------------------------------------------
         /*
+         * Get an activity's edit state.
+        */
+        // --------------------------------------------------------------------------------
+        [GET("{activityId}/edit-state")]
+        public ActivityEditState GetEditState(int activityId)
+        {
+            /* Get the activity we want to edit */
+            var activity = _queryProcessor.Execute(new ActivityById(activityId));
+            if (activity == null)
+            {
+                throw new HttpResponseException(HttpStatusCode.NotFound);
+            }
+
+            var editState = new ActivityEditState();
+
+            editState.IsInEdit = activity.EditSourceId.HasValue;
+
+            // TBD
+            editState.EditingUserName = "";
+            editState.EditingUserEmail = "";
+
+            return editState;
+        }
+
+
+        // --------------------------------------------------------------------------------
+        /*
          * Create an activity
         */
         // --------------------------------------------------------------------------------
         [POST("")]
         public HttpResponseMessage Post()
         {
-            var createActivityCommand = new CreateMyNewActivity
-            {
-                User = _queryProcessor.Execute( new UserByName(User.Identity.Name) ),
-                ModeText = ActivityMode.Draft.AsSentenceFragment()
-            };
+            var createDeepActivityCommand =
+                new CreateDeepActivity(_queryProcessor.Execute(new UserByName(User.Identity.Name)),
+                                       ActivityMode.Draft.AsSentenceFragment());
+            _createDeepActivity.Handle(createDeepActivityCommand);
 
-            var model = Mapper.Map<ActivityApiModel>(createActivityCommand.CreatedActivity);
+            var model = createDeepActivityCommand.CreatedActivity.RevisionId;
             return Request.CreateResponse(HttpStatusCode.OK, model);
         }
 
@@ -180,16 +204,34 @@ namespace UCosmic.Web.Mvc.ApiControllers
         */
         // --------------------------------------------------------------------------------
         [PUT("{activityId}")]
-        public HttpResponseMessage Put(int activityId)
+        public HttpResponseMessage Put(int activityId, ActivityApiModel model)
         {
-            /* TBD
-             * update the owning activity from downstream aggregate mutation commands
-             * in commands that mutate an entity under the activity aggregate
-             * update those 2 fields on the owning Activity
-             * document.Owner.UpdatedOn = DateTime.UtcNow;
-             * document.Owner.UpdatedBy = command.Principal.Identity.Name;
-             */
-            return Request.CreateResponse(HttpStatusCode.NotImplemented);
+            if ((activityId == 0) || (model == null)) return Request.CreateResponse(HttpStatusCode.InternalServerError);
+
+            var activity = Mapper.Map<Activity>(model);
+            try
+            {
+                var updateActivityCommand = new UpdateActivity(User,
+                                                               activity.RevisionId,
+                                                               DateTime.Now,
+                                                               activity.ModeText)
+                {
+                    Values = activity.Values.SingleOrDefault(x => x.ModeText == activity.ModeText)
+                };
+                _updateActivity.Handle(updateActivityCommand);
+            }
+            catch (Exception ex)
+            {
+                var responseMessage = new HttpResponseMessage
+                {
+                    StatusCode = HttpStatusCode.NotModified,
+                    Content = new StringContent(ex.Message),
+                    ReasonPhrase = "Activity update error"
+                };
+                throw new HttpResponseException(responseMessage);
+            }
+
+            return Request.CreateResponse(HttpStatusCode.OK);
         }
 
         // --------------------------------------------------------------------------------
@@ -199,11 +241,11 @@ namespace UCosmic.Web.Mvc.ApiControllers
         */
         // --------------------------------------------------------------------------------
         [PUT("{activityId}/edit")]
-        public HttpResponseMessage PutEdit(int activityId)
+        public HttpResponseMessage PutEdit(int activityId, [FromBody] string mode)
         {
             try
             {
-                var editActivity = _queryProcessor.Execute(new ActivityByEditSourceId(activityId));
+                var editActivity = _queryProcessor.Execute(new ActivityById(activityId));
                 if (editActivity == null)
                 {
                     var message = string.Format("Activity Id {0} not found.", activityId);
@@ -216,15 +258,14 @@ namespace UCosmic.Web.Mvc.ApiControllers
                     throw new Exception(message);
                 }
 
-                var updateActivityCommand = new UpdateActivity(User, editActivity.EditSourceId.Value)
+                var updateActivityCommand = new UpdateActivity(User, editActivity.EditSourceId.Value, DateTime.Now, mode)
                 {
-                    ModeText = editActivity.ModeText,
-                    Values = editActivity.Values.SingleOrDefault(x => x.ModeText == editActivity.ModeText),
-                    UpdatedOn = DateTime.UtcNow,
-                    UpdatedBy = User
+                    Values = editActivity.Values.SingleOrDefault(x => x.ModeText == editActivity.ModeText)
                 };
-
                 _updateActivity.Handle(updateActivityCommand);
+
+                var deleteActivityCommand = new DeleteActivity(User, editActivity.RevisionId);
+                _deleteActivity.Handle(deleteActivityCommand);
             }
             catch (Exception ex)
             {

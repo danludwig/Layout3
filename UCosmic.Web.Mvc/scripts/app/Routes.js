@@ -334,10 +334,22 @@ var App;
                     return makeUrl('activities');
                 }
                 Activities.post = post;
+                function getEdit(activityId) {
+                    return makeUrl('activities/' + activityId + "/edit");
+                }
+                Activities.getEdit = getEdit;
+                function getEditState(activityId) {
+                    return makeUrl('activities/' + activityId + "/edit-state");
+                }
+                Activities.getEditState = getEditState;
                 function put(activityId) {
                     return makeUrl('activities/' + activityId);
                 }
                 Activities.put = put;
+                function putEdit(activityId) {
+                    return makeUrl('activities/' + activityId + "/edit");
+                }
+                Activities.putEdit = putEdit;
                 function del(activityId) {
                     return makeUrl('activities/' + activityId);
                 }
@@ -430,14 +442,21 @@ var App;
                 var Users = Identity.Users;
             })(Mvc.Identity || (Mvc.Identity = {}));
             var Identity = Mvc.Identity;
-            (function (Profile) {
-                function activityEdit(activityId) {
-                    var url = makeUrl('my/activity/');
-                    return url + activityId;
-                }
-                Profile.activityEdit = activityEdit;
-            })(Mvc.Profile || (Mvc.Profile = {}));
-            var Profile = Mvc.Profile;
+            (function (My) {
+                (function (Profile) {
+                    function get() {
+                        return makeUrl('my/profile');
+                    }
+                    Profile.get = get;
+                    function activityEdit(activityId) {
+                        var url = makeUrl('my/activity/');
+                        return url + activityId;
+                    }
+                    Profile.activityEdit = activityEdit;
+                })(My.Profile || (My.Profile = {}));
+                var Profile = My.Profile;
+            })(Mvc.My || (Mvc.My = {}));
+            var My = Mvc.My;
         })(Routes.Mvc || (Routes.Mvc = {}));
         var Mvc = Routes.Mvc;
     })(App.Routes || (App.Routes = {}));

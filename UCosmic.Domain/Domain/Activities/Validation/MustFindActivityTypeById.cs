@@ -5,13 +5,13 @@ using FluentValidation.Validators;
 
 namespace UCosmic.Domain.Activities
 {
-    public class MustFindActivityValuesById : PropertyValidator
+    public class MustFindActivityTypeById : PropertyValidator
     {
-        public const string FailMessageFormat = "ActivityValues with id '{0}' does not exist.";
+        public const string FailMessageFormat = "ActivityType with id '{0}' does not exist.";
 
         private readonly IQueryEntities _entities;
 
-        internal MustFindActivityValuesById(IQueryEntities entities)
+        internal MustFindActivityTypeById(IQueryEntities entities)
             : base(FailMessageFormat.Replace("{0}", "{PropertyValue}"))
         {
             if (entities == null) throw new ArgumentNullException("entities");
@@ -27,19 +27,19 @@ namespace UCosmic.Domain.Activities
             context.MessageFormatter.AppendArgument("PropertyValue", context.PropertyValue);
             var value = (int)context.PropertyValue;
 
-            var entity = _entities.Query<ActivityValues>()
+            var entity = _entities.Query<ActivityType>()
                 .SingleOrDefault(x => x.RevisionId == value);
 
             return entity != null;
         }
     }
 
-    public static class MustFindActivityValuesByIdExtensions
+    public static class MustFindActivityTypeByIdExtensions
     {
-        public static IRuleBuilderOptions<T, int> MustFindActivityValuesById<T>
+        public static IRuleBuilderOptions<T, int> MustFindActivityTypeById<T>
             (this IRuleBuilder<T, int> ruleBuilder, IQueryEntities entities)
         {
-            return ruleBuilder.SetValidator(new MustFindActivityValuesById(entities));
+            return ruleBuilder.SetValidator(new MustFindActivityTypeById(entities));
         }
     }
 }

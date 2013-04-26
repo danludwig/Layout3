@@ -8,8 +8,9 @@ namespace UCosmic.Domain.Activities
 {
     public class UpdateActivityValues
     {
-        public IPrincipal Principal { get; protected internal set; }
-        public int Id { get; protected internal set; }
+        public IPrincipal Principal { get; protected set; }
+        public int Id { get; protected set; }
+        public DateTime UpdatedOn { get; protected set; }
         public string Title { get; set; }
         public string Content { get; set; }
         public DateTime? StartsOn { get; set; }
@@ -21,15 +22,16 @@ namespace UCosmic.Domain.Activities
         public virtual ICollection<ActivityType> Types { get; set; }
         public virtual ICollection<ActivityTag> Tags { get; set; }
         public virtual ICollection<ActivityDocument> Documents { get; set; }
-        public DateTime UpdatedOn { get; set; }
-        public IPrincipal UpdatedBy { get; set; }
         public bool NoCommit { get; set; }
 
-        public UpdateActivityValues(IPrincipal principal, int id)
+        public UpdateActivityValues(IPrincipal principal, int id, DateTime updatedOn)
         {
             if (principal == null) { throw new ArgumentNullException("principal"); }
+            if (updatedOn == null) { throw new ArgumentNullException("updatedOn"); }
+
             Principal = principal;
             Id = id;
+            UpdatedOn = updatedOn.ToUniversalTime();
         }
     }
 
@@ -37,16 +39,43 @@ namespace UCosmic.Domain.Activities
     {
         private readonly ICommandEntities _entities;
         private readonly IHandleCommands<CreateActivityLocation> _createActivityLocation;
-        private readonly IHandleCommands<DeleteActivityLocation> _deleteActivityLocation; 
+        private readonly IHandleCommands<UpdateActivityLocation> _updateActivityLocation;
+        private readonly IHandleCommands<DeleteActivityLocation> _deleteActivityLocation;
+        private readonly IHandleCommands<CreateActivityType> _createActivityType;
+        private readonly IHandleCommands<UpdateActivityType> _updateActivityType;
+        private readonly IHandleCommands<DeleteActivityType> _deleteActivityType;
+        private readonly IHandleCommands<CreateActivityTag> _createActivityTag;
+        private readonly IHandleCommands<DeleteActivityTag> _deleteActivityTag;
+        private readonly IHandleCommands<CreateActivityDocument> _createActivityDocument;
+        private readonly IHandleCommands<UpdateActivityDocument> _updateActivityDocument;
+        private readonly IHandleCommands<DeleteActivityDocument> _deleteActivityDocument;
 
         public HandleUpdateActivityValuesCommand(ICommandEntities entities,
                                                  IHandleCommands<CreateActivityLocation> createActivityLocation,
-                                                 IHandleCommands<DeleteActivityLocation> deleteActivityLocation)
+                                                 IHandleCommands<UpdateActivityLocation> updateActivityLocation,
+                                                 IHandleCommands<DeleteActivityLocation> deleteActivityLocation,
+                                                 IHandleCommands<CreateActivityType> createActivityType,
+                                                 IHandleCommands<UpdateActivityType> updateActivityType,
+                                                 IHandleCommands<DeleteActivityType> deleteActivityType,
+                                                 IHandleCommands<CreateActivityTag> createActivityTag,
+                                                 IHandleCommands<DeleteActivityTag> deleteActivityTag,            
+                                                 IHandleCommands<CreateActivityDocument> createActivityDocument,
+                                                 IHandleCommands<UpdateActivityDocument> updateActivityDocument,
+                                                 IHandleCommands<DeleteActivityDocument> deleteActivityDocument )
         {
             _entities = entities;
             _createActivityLocation = createActivityLocation;
+            _updateActivityLocation = updateActivityLocation;
             _deleteActivityLocation = deleteActivityLocation;
-        }
+            _createActivityType = createActivityType;
+            _updateActivityType = updateActivityType;
+            _deleteActivityType = deleteActivityType;
+            _createActivityTag = createActivityTag;
+            _deleteActivityTag= deleteActivityTag;
+            _createActivityDocument = createActivityDocument;
+            _updateActivityDocument = updateActivityDocument;
+            _deleteActivityDocument = deleteActivityDocument;
+       }
 
         public class ValidateUpdateActivityValuesCommand : AbstractValidator<UpdateActivityValues>
         {
@@ -55,7 +84,7 @@ namespace UCosmic.Domain.Activities
                 CascadeMode = CascadeMode.StopOnFirstFailure;
 
                 RuleFor(x => x.Principal)
-                    .MustOwnActivityDocument(entities, x => x.Id)
+                    .MustOwnActivityValues(entities, x => x.Id)
                     .WithMessage(MustOwnActivityValues<object>.FailMessageFormat, x => x.Principal.Identity.Name, x => x.Id);
 
                 RuleFor(x => x.Id)
@@ -64,7 +93,7 @@ namespace UCosmic.Domain.Activities
                         .WithMessage(MustBePositivePrimaryKey.FailMessageFormat, x => "ActivityValues id", x => x.Id)
 
                     // id must exist in the database
-                    .MustFindActivityDocumentById(entities)
+                    .MustFindActivityValuesById(entities)
                         .WithMessage(MustFindActivityValuesById.FailMessageFormat, x => x.Id)
                 ;
             }
@@ -107,10 +136,12 @@ namespace UCosmic.Domain.Activities
             target.Mode = command.Mode;
             target.WasExternallyFunded = command.WasExternallyFunded;
             target.WasInternallyFunded = command.WasInternallyFunded;
+            target.UpdatedOnUtc = command.UpdatedOn.ToUniversalTime();
 
-            /* Run through all new locations and attempt to find same in targe.  If found,
-             * update.  If not, create. */
-            foreach (var location in command.Locations)
+            /* ----- Activity Locations ----- */
+
+            /* Run through all new locations and attempt to find same in target.  If not found, create.*/
+            foreach (var location in command.Locations.ToList())
             {
                 var targetLocation = target.Locations.SingleOrDefault(x => x.PlaceId == location.PlaceId);
                 if (targetLocation == null)
@@ -124,28 +155,17 @@ namespace UCosmic.Domain.Activities
 
                     _createActivityLocation.Handle(createActivityLocation);
                 }
-                else
-                {
-                    /* Since there are no other fields than Place/PlaceId, there's not much updating
-                     * to do. I'll leave this here for future use. */
-
-                    //var updateActivityLocation = new UpdateActivityLocation
-                    //{
-                    //    Id = targetLocation.RevisionId,
-                    //    NoCommit = true
-                    //};
-                    //_updateActivityLocation.Handle(updateActivityLocation);
-                }
-
             }
 
-            /* Delete activity locations. */
-            foreach (ActivityLocation location in target.Locations)
+            /* Delete activity locations. Run through the targets list of locations and try to find
+                a matching one in the updated list.  If not found, it must have been deleted. */
+            foreach (var location in target.Locations.ToList())
             {
                 var updateLocation = command.Locations.SingleOrDefault(x => x.PlaceId == location.PlaceId);
                 if (updateLocation == null)
                 {
-                    var deleteActivityLocationCommand = new DeleteActivityLocation(command.Principal,location.RevisionId)
+                    var deleteActivityLocationCommand = new DeleteActivityLocation(command.Principal,
+                                                                                   location.RevisionId)
                     {
                         NoCommit = true
                     };
@@ -153,6 +173,140 @@ namespace UCosmic.Domain.Activities
                     _deleteActivityLocation.Handle(deleteActivityLocationCommand);
                 }
             }
+
+            /* ----- Activity Types ----- */
+
+            foreach (var type in command.Types.ToList())
+            {
+                var targetType = target.Types.SingleOrDefault(x => x.TypeId == type.TypeId);
+                if (targetType == null)
+                {
+                    var createActivityType = new CreateActivityType(target.RevisionId, type.TypeId)
+                    {
+                        NoCommit = true
+                    };
+
+                    _createActivityType.Handle(createActivityType);
+                }
+            }
+
+            foreach (var type in target.Types.ToList())
+            {
+                var updateType = command.Types.SingleOrDefault(x => x.TypeId == type.TypeId);
+                if (updateType == null)
+                {
+                    var deleteActivityTypeCommand = new DeleteActivityType(command.Principal, type.RevisionId)
+                    {
+                        NoCommit = true
+                    };
+                    _deleteActivityType.Handle(deleteActivityTypeCommand);
+                }
+            }
+
+            /* ----- Activity Tags ----- */
+
+            /* Activity tags are not updated.  They either exist or not. */
+            foreach (var tag in command.Tags.ToList())
+            {
+                var targetTag = target.Tags.SingleOrDefault(x => x.Text == tag.Text);
+                if (targetTag == null)
+                {
+                    var createActivityTag = new CreateActivityTag
+                    {
+                        ActivityValuesId = target.RevisionId,
+                        Number = tag.Number,
+                        Text = tag.Text,
+                        DomainType = tag.DomainType,
+                        DomainKey = tag.DomainKey,
+                        Mode = tag.Mode,
+                        NoCommit = true
+                    };
+                    _createActivityTag.Handle(createActivityTag);
+                }
+            }
+
+            foreach (var tag in target.Tags.ToList())
+            {
+                var updateTag = command.Tags.SingleOrDefault(x => x.Text == tag.Text);
+                if (updateTag == null)
+                {
+                    var deleteActivityTagCommand = new DeleteActivityTag(command.Principal, tag.RevisionId)
+                    {
+                        NoCommit = true
+                    };
+                    _deleteActivityTag.Handle(deleteActivityTagCommand);
+                }
+            }
+
+            /* ----- Activity Documents ----- */
+
+            foreach (var document in command.Documents.ToList())
+            {
+                ActivityDocument targetDocument = null;
+
+                if (document.FileId.HasValue)
+                {
+                    targetDocument = target.Documents.SingleOrDefault(x => x.FileId == document.FileId);
+                }
+                else if (document.ImageId.HasValue)
+                {
+                    targetDocument = target.Documents.SingleOrDefault(x => x.ImageId == document.ImageId);
+                }
+
+                if (targetDocument == null)
+                {
+                    var createActivityDocument = new CreateActivityDocument
+                    {
+                        ActivityValuesId = target.RevisionId,
+                        FileId = document.FileId,
+                        ImageId = document.ImageId,
+                        Mode = document.Mode,
+                        Title = document.Title,
+                        Visible = document.Visible,
+                        NoCommit = true
+                    };
+                    _createActivityDocument.Handle(createActivityDocument);
+                }
+                else
+                {
+                    var updateActivityDocument = new UpdateActivityDocument(command.Principal,
+                                                                            targetDocument.RevisionId,
+                                                                            command.UpdatedOn)
+                    {
+                        FileId = document.FileId,
+                        ImageId = document.ImageId,
+                        Mode = document.Mode,
+                        Title = document.Title,
+                        Visible = document.Visible,
+                        NoCommit = true
+                    };
+                    _updateActivityDocument.Handle(updateActivityDocument);
+                }
+            }
+
+            foreach (var document in target.Documents.ToList())
+            {
+                ActivityDocument updateDocument = null;
+
+                if (document.FileId.HasValue)
+                {
+                    updateDocument = command.Documents.SingleOrDefault(x => x.FileId == document.FileId);
+                }
+                else if (document.ImageId.HasValue)
+                {
+                    updateDocument = command.Documents.SingleOrDefault(x => x.ImageId == document.ImageId);
+                }
+
+                if (updateDocument == null)
+                {
+                    var deleteActivityDocumentCommand = new DeleteActivityDocument(command.Principal, document.RevisionId)
+                    {
+                        NoCommit = true
+                    };
+                    _deleteActivityDocument.Handle(deleteActivityDocumentCommand);
+                }
+            }
+
 
             if (!command.NoCommit)
             {

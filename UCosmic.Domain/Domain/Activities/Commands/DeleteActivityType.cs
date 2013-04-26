@@ -5,13 +5,13 @@ using FluentValidation;
 
 namespace UCosmic.Domain.Activities
 {
-    public class DeleteActivity
+    public class DeleteActivityType
     {
         public IPrincipal Principal { get; private set; }
         public int Id { get; private set; }
         public bool NoCommit { get; set; }
 
-        public DeleteActivity(IPrincipal principal, int id)
+        public DeleteActivityType(IPrincipal principal, int id)
         {
             if (principal == null) { throw new ArgumentNullException("principal"); }
             Principal = principal;
@@ -19,35 +19,35 @@ namespace UCosmic.Domain.Activities
         }
     }
 
-    public class ValidateDeleteActivityCommand : AbstractValidator<DeleteActivity>
+    public class ValidateDeleteActivityTypeCommand : AbstractValidator<DeleteActivityType>
     {
-        public ValidateDeleteActivityCommand(IQueryEntities entities)
+        public ValidateDeleteActivityTypeCommand(IQueryEntities entities)
         {
             CascadeMode = CascadeMode.StopOnFirstFailure;
 
             RuleFor(x => x.Principal)
-                .MustOwnActivity(entities, x => x.Id)
-                    .WithMessage(MustOwnActivity<object>.FailMessageFormat, x => x.Principal.Identity.Name, x => x.Id);
+                .MustOwnActivityType(entities, x => x.Id)
+                .WithMessage(MustOwnActivityType<object>.FailMessageFormat, x => x.Principal.Identity.Name, x => x.Id);
 
             RuleFor(x => x.Id)
                 // id must be within valid range
                 .GreaterThanOrEqualTo(1)
-                    .WithMessage(MustBePositivePrimaryKey.FailMessageFormat, x => "Activity id", x => x.Id)
+                    .WithMessage(MustBePositivePrimaryKey.FailMessageFormat, x => "ActivityType id", x => x.Id)
 
                 // id must exist in the database
-                .MustFindActivityById(entities)
-                    .WithMessage(MustFindActivityById.FailMessageFormat, x => x.Id)
+                .MustFindActivityTypeById(entities)
+                    .WithMessage(MustFindActivityTypeById.FailMessageFormat, x => x.Id)
             ;
         }
     }
 
-    public class HandleDeleteActivityCommand : IHandleCommands<DeleteActivity>
+    public class HandleDeleteActivityTypeCommand : IHandleCommands<DeleteActivityType>
     {
         private readonly ICommandEntities _entities;
         private readonly IUnitOfWork _unitOfWork;
         //private readonly IProcessEvents _eventProcessor;
 
-        public HandleDeleteActivityCommand(ICommandEntities entities
+        public HandleDeleteActivityTypeCommand(ICommandEntities entities
             , IUnitOfWork unitOfWork
             //, IProcessEvents eventProcessor
         )
@@ -57,19 +57,13 @@ namespace UCosmic.Domain.Activities
             //_eventProcessor = eventProcessor;
         }
 
-        public void Handle(DeleteActivity command)
+        public void Handle(DeleteActivityType command)
         {
             if (command == null) throw new ArgumentNullException("command");
 
-            var activity = _entities.Get<Activity>().SingleOrDefault(x => x.RevisionId == command.Id);
-            if (activity == null) return;
-
-            _entities.Purge(activity);
-
-            if (!command.NoCommit)
-            {
-                _unitOfWork.SaveChanges();
-            }
+            // load target
+            var activityType = _entities.Get<ActivityType>().SingleOrDefault(x => x.RevisionId == command.Id);
+            if (activityType == null) return; // delete idempotently
 
             // TBD
             // log audit
@@ -80,7 +74,14 @@ namespace UCosmic.Domain.Activities
             //    Value = JsonConvert.SerializeObject(new { command.Id }),
             //    PreviousState = activityDocument.ToJsonAudit(),
             //};
+
             //_entities.Create(audit);
+            _entities.Purge(activityType);
+
+            if (!command.NoCommit)
+            {
+                _unitOfWork.SaveChanges();
+            }
 
             //_eventProcessor.Raise(new EstablishmentChanged());
         }
