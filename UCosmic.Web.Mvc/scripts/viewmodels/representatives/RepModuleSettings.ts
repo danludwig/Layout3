@@ -10,24 +10,8 @@
 
 module ViewModels.RepModuleSettings{
 
-
-    export class RepModuleSettings{
-        welcomeMessage: string;
-        emailMessage: string;
-
-        constructor(welcomeMessage:string, emailMessage:string){
-            this.welcomeMessage = welcomeMessage;
-            this.emailMessage = emailMessage;
-        }
-    }
-
-    function RepModuleSettings(){
-        var self = this;
-
-        self.isBound = ko.observable();
-
-        self.back = function () {
-            history.back();
-        };
+        export class RepModuleSettings{
+        welcomeMessage: KnockoutObservableString = ko.observable();
+        emailMessage: KnockoutObservableString = ko.observable();
     }
 }
