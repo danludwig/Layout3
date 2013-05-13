@@ -39,9 +39,11 @@
                     countrySelector.value(activityViewModel.selectedLocations());
 
                     var datePicker = $("#fromDatePicker").data("kendoDatePicker");
+                    datePicker.options.format = activityViewModel.values.dateFormat();
                     datePicker.value(activityViewModel.values.startsOn());
 
                     datePicker = $("#toDatePicker").data("kendoDatePicker");
+                    datePicker.options.format = activityViewModel.values.dateFormat();
                     datePicker.value(activityViewModel.values.endsOn());
 
                     /* NOTE: Using TinyMCE autosave plugin will disable window.onbeforeunload. */
@@ -95,32 +97,44 @@
                                         <td class="required-field-name">Country/Location</td>
                                         <td>
                                             <select id="countrySelector" style="width: 750px; overflow-y:auto" data-bind="selectedOptions: selectedLocations"></select>
+                                            <span data-bind="validationMessage: values.locations" class="validationMessage"></span>
                                         </td>
                                     </tr>
                                     <!-- TYPE -->
                                     <tr>
                                         <td class="required-field-name">Types</td>
                                         <td>
-                                            <ul class="data-items" data-bind="template: { name: 'activity-types-template', foreach: activityTypes() }" />
+                                            <!-- Need this div for the validation message to display. -->
+                                            <div>
+                                                <ul class="data-items" data-bind="template: { name: 'activity-types-template', foreach: activityTypes() }" />
+                                            </div>
+                                            <span data-bind="validationMessage: values.types" class="validationMessage"></span>
                                         </td>
                                     </tr>
                                     <!-- FROM and TO DATES -->
                                     <tr>
                                         <td class="field-name" style="vertical-align: top">On/From</td>
                                         <td>
-                                            <input id="fromDatePicker" style="height: 30px; vertical-align: middle" data-bind="value: values.startsOn"/>
-                                            <span>
-                                                &emsp;
-                                                <input id="ongoingCheckbox" type="checkbox" data-bind="checked: isOnGoing"/>
-                                                <span>&nbsp;On-going&nbsp;</span>
-                                            </span>
-                                            <span data-bind="visible: !isOnGoing()">
-                                                <span>&nbsp;&nbsp;To&nbsp;</span>
-                                                <input id="toDatePicker" style="height: 30px; vertical-align: middle" data-bind="value: values.endsOn"/>
-                                                <!-- <img src="~/images/icons/help/question-mark-24-blue.png" alt="Help" class="help-icon" data-bind="click: function (data, event) { help(data, event, null); }"/> -->  
-                                            </span>
+                                            <div data-bind='validationOptions: { insertMessages: false }'>
+                                                <input id="fromDatePicker" style="height: 30px; vertical-align: middle" data-bind="value: values.startsOn"/>
+                                                <span>
+                                                    &emsp;
+                                                    <input id="ongoingCheckbox" type="checkbox" data-bind="checked: values.onGoing"/>
+                                                    <span>&nbsp;On-going&nbsp;</span>
+                                                </span>
+                                                <span data-bind="visible: !values.onGoing()">
+                                                    <span>&nbsp;&nbsp;To&nbsp;</span>                                                
+                                                    <input id="toDatePicker" style="height: 30px; vertical-align: middle" data-bind="value: values.endsOn"/>
+                                                    <!-- <img src="~/images/icons/help/question-mark-24-blue.png" alt="Help" class="help-icon" data-bind="click: function (data, event) { help(data, event, null); }"/> -->  
+                                                </span>
+                                            </div>
+                                            <!--<span data-bind="validationMessage: values.endsOn" class="validationMessage"></span>-->
                                             <div class="example" style="margin-top: 8px">
                                                 <span>Enter dates as yyyy, mm/yyyy or use date picker.</span>
+                                                <div>
+                                                    <span data-bind="validationMessage: values.startsOn" class="validationMessage"></span>
+                                                    <span data-bind="validationMessage: values.endsOn" class="validationMessage"></span>
+                                                </div>
                                             </div>
                                         </td>
                                     </tr>
@@ -234,19 +248,16 @@
 
                   
 <!-- JQUERY DIALOGS -->
-<div id="documentRenameErrorDialog" style="visibility: hidden" title="Error Renaming Document">
+<div id="documentRenameErrorDialog" class="dialog" title="Error Renaming Document">
     <span id="message" style="float: left"></span>
 </div>
 
-<div id="cancelConfirmDialog" style="visibility: hidden" title="Confirm Cancel">
-    <div>By cancelling, you will lose all changes.</div>
-    <br/>
-    <div style="font-weight: bold">Are you sure you want to Cancel editing this Activity?</div>
+<div id="cancelConfirmDialog" class="dialog" title="Confirm Cancel">
+    <span style="font-weight: bold">Are you sure you want to Cancel editing this Activity?</span>
 </div>
 
-<div id="activityBeingEditedDialog" style="visibility: hidden" title="Error Renaming Document">
-    <div>The activity cannot be edited at this time because it is in use by:</div>
-    <br/>
+<div id="activityBeingEditedDialog" class="dialog" title="Error Renaming Document">
+    <span style="font-weight: bold">The activity cannot be edited at this time because it is in use by:</span>
     <div id="editingUserName" style="text-align: center"></div>
     <a id="editingUserEmail" style="text-align: center"></a>
 </div>
@@ -308,7 +319,7 @@
 <script type="text/html" id="buttons-template">
     <span>
         <input type="button" value="Save as Draft" data-bind="click: function (item, event) { save(item, event, 'Draft'); }, clickBubble: false"/>
-        <input type="button" value="Save as Final" data-bind="click: function (item, event) { save(item, event, 'Public'); }, clickBubble: false"/>
+        <input type="button" value="Publish" data-bind="click: function (item, event) { save(item, event, 'Public'); }, clickBubble: false"/>
         <input type="button" value="Guide Me" style="margin-left: 50px"/>
         <input type="button" value="Cancel" style="float: right" data-bind="click: function (item, event) { cancel(item, event); }, clickBubble: false"/>
     </span>

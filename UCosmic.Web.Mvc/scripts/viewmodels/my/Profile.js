@@ -4,6 +4,11 @@ var ViewModels;
         var Profile = (function () {
             function Profile() {
                 this._isInitialized = false;
+                this._activitiesViewModel = null;
+                this._geographicExpertisesViewModel = null;
+                this._languageExpertisesViewModel = null;
+                this._degreesViewModel = null;
+                this._affiliationsViewModel = null;
                 this.hasPhoto = ko.observable();
                 this.isPhotoExtensionInvalid = ko.observable(false);
                 this.isPhotoTooManyBytes = ko.observable(false);
@@ -70,6 +75,59 @@ var ViewModels;
                     }
                 }, function (xhr, textStatus, errorThrown) {
                 });
+            };
+            Profile.prototype.startTab = function (tabName) {
+                var _this = this;
+                var viewModel;
+                if(tabName === "Activities") {
+                    if(this._activitiesViewModel == null) {
+                        this._activitiesViewModel = new ViewModels.Activities.ActivityList(this.personId);
+                        this._activitiesViewModel.load().done(function () {
+                            ko.applyBindings(_this._activitiesViewModel, $("#activities")[0]);
+                        }).fail(function (jqXhr, textStatus, errorThrown) {
+                            alert(textStatus + "|" + errorThrown);
+                        });
+                    }
+                } else if(tabName === "Geographic Expertise") {
+                    if(this._geographicExpertisesViewModel == null) {
+                        this._geographicExpertisesViewModel = new ViewModels.GeographicExpertises.GeographicExpertiseList(this.personId);
+                        this._geographicExpertisesViewModel.load().done(function () {
+                            ko.applyBindings(_this._geographicExpertisesViewModel, $("#geographic-expertises")[0]);
+                        }).fail(function (jqXhr, textStatus, errorThrown) {
+                            alert(textStatus + "|" + errorThrown);
+                        });
+                    }
+                } else if(tabName === "Language Expertise") {
+                    if(this._languageExpertisesViewModel == null) {
+                        this._languageExpertisesViewModel = new ViewModels.LanguageExpertises.LanguageExpertiseList(this.personId);
+                        this._languageExpertisesViewModel.load().done(function () {
+                            ko.applyBindings(_this._languageExpertisesViewModel, $("#language-expertises")[0]);
+                        }).fail(function (jqXhr, textStatus, errorThrown) {
+                            alert(textStatus + "|" + errorThrown);
+                        });
+                    }
+                } else if(tabName === "Formal Education") {
+                    if(this._degreesViewModel == null) {
+                        this._degreesViewModel = new ViewModels.Degrees.DegreeList(this.personId);
+                        this._degreesViewModel.load().done(function () {
+                            ko.applyBindings(_this._degreesViewModel, $("#degrees")[0]);
+                        }).fail(function (jqXhr, textStatus, errorThrown) {
+                            alert(textStatus + "|" + errorThrown);
+                        });
+                    }
+                } else if(tabName === "Affiliations") {
+                    if(this._affiliationsViewModel == null) {
+                        this._affiliationsViewModel = new ViewModels.Affiliations.AffiliationList(this.personId);
+                        this._affiliationsViewModel.load().done(function () {
+                            ko.applyBindings(_this._affiliationsViewModel, $("#affiliations")[0]);
+                        }).fail(function (jqXhr, textStatus, errorThrown) {
+                            alert(textStatus + "|" + errorThrown);
+                        });
+                    }
+                }
+            };
+            Profile.prototype.tabClickHandler = function (event) {
+                this.startTab(event.item.innerText);
             };
             Profile.prototype.startEditing = function () {
                 this.editMode(true);

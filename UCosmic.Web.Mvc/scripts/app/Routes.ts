@@ -443,39 +443,27 @@ module App.Routes {
             }
         } // LanguageExpertises
 
-        export module FormalEducations {
-            export function get (educationId?: number): string {
-                var url = makeUrl('educations');
-                if (educationId) {
-                    url += '/' + educationId;
+        export module Degrees {
+            export function get (degreeId?: number): string {
+                var url = makeUrl('degrees');
+                if (degreeId) {
+                    url += '/' + degreeId;
                 }
                 return url;
             }
 
             export function post(): string {
-                return makeUrl('educations');
+                return makeUrl('degrees');
             }
 
-            export function getEdit (educationId: number): string {
-                return makeUrl('educations/' + educationId + "/edit");
+            export function put(degreeId: number): string {
+                return makeUrl('degrees/' + degreeId);
             }
 
-            export function getEditState (educationId: number): string {
-                return makeUrl('educations/' + educationId + "/edit-state");
+            export function del(degreeId: number): string {
+                return makeUrl('degrees/' + degreeId);
             }
-
-            export function put(educationId: number): string {
-                return makeUrl('educations/' + educationId);
-            }
-
-            export function putEdit(educationId: number): string {
-                return makeUrl('educations/' + educationId + "/edit");
-            }
-
-            export function del(educationId: number): string {
-                return makeUrl('educations/' + educationId);
-            }
-        } // FormalEducations
+        } // Degrees
 
         export module Affiliations {
             export function get (affiliationId?: number): string {
@@ -559,13 +547,13 @@ module App.Routes {
                     var url = makeUrl( 'my/langexpertise/' );
                     return url + expertiseId;
                 }
-                export function formalEducationEdit( expertiseId: string ) {
-                    var url = makeUrl( 'my/education/' );
-                    return url + expertiseId;
+                export function degreeEdit( degreeId: string ) {
+                    var url = makeUrl( 'my/degree/' );
+                    return url + degreeId;
                 }
-                export function affiliationEdit( expertiseId: string ) {
+                export function affiliationEdit( affiliationId: string ) {
                     var url = makeUrl( 'my/affiliation/' );
-                    return url + expertiseId;
+                    return url + affiliationId;
                 }
             }
         }

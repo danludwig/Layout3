@@ -77,7 +77,7 @@ module ViewModels.Activities
             activitiesSearchInput.personId = this.personId;
             activitiesSearchInput.orderBy = "";
             activitiesSearchInput.pageNumber = 1;
-            activitiesSearchInput.pageSize = 10;
+            activitiesSearchInput.pageSize = 2147483647; /* C# Int32.Max */
 
             $.get(App.Routes.WebApi.Activities.get(), activitiesSearchInput)
                 .done((data: Service.ApiModels.IEmployeeActivityType[], textStatus: string, jqXHR: JQueryXHR): void => {
@@ -296,28 +296,28 @@ module ViewModels.Activities
         /*  
         */
         // --------------------------------------------------------------------------------
-        activityDatesFormatted(startsOnStr: Date, endsOnStr: Date): string
+        activityDatesFormatted(startsOnStr: Date, endsOnStr: Date, onGoing: bool, dateFormat: string): string
         {
             var formattedDateRange: string = "";
-            //var startsOn = (startsOnStr != null) ? new Date(startsOnStr) : null;
-            //var endsOn = (endsOnStr != null) ? new Date(endsOnStr) : null;
+
+            /* May need a separate function to convert from CLR custom date formats to moment formats */
+            dateFormat = (dateFormat != null) ? dateFormat.toUpperCase() : "MM/DD/YYYY";
 
             if (startsOnStr == null)
             {
                 if (endsOnStr != null)
                 {
-                    //formattedDateRange = endsOn.getMonth()+1 + "/" + endsOn.getDate() + "/" + endsOn.getFullYear();
-                    formattedDateRange = moment(endsOnStr).format("MM/DD/YYYY");
+                    formattedDateRange = moment(endsOnStr).format(dateFormat);
                 }
             }
             else
             {
-                //formattedDateRange = startsOn.getMonth()+1 + "/" + startsOn.getDate() + "/" + startsOn.getFullYear();
-                formattedDateRange = moment(startsOnStr).format("MM/DD/YYYY");
-                if (endsOnStr != null)
+                formattedDateRange = moment(startsOnStr).format(dateFormat);
+                if (onGoing) {
+                    formattedDateRange += " -";
+                } else if (endsOnStr != null)
                 {
-                    //formattedDateRange += " - " + endsOn.getMonth() + "/" + endsOn.getDate() + "/" + endsOn.getFullYear();
-                    formattedDateRange += " - " + moment(endsOnStr).format("MM/DD/YYYY");
+                    formattedDateRange += " - " + moment(endsOnStr).format(dateFormat);
                 }
             }
 

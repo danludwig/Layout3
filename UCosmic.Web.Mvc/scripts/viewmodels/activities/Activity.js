@@ -9,7 +9,6 @@ var ViewModels;
                 this.addingTag = ko.observable(false);
                 this.newTag = ko.observable();
                 this.uploadingDocument = ko.observable(false);
-                this.isOnGoing = ko.observable(false);
                 this.inititializationErrors = "";
                 this.AUTOSAVE_KEYCOUNT = 10;
                 this.keyCounter = 0;
@@ -28,9 +27,19 @@ var ViewModels;
             };
             Activity.prototype.setupWidgets = function (fromDatePickerId, toDatePickerId, countrySelectorId, uploadFileId, newTagId) {
                 var _this = this;
-                $("#" + fromDatePickerId).kendoDatePicker();
-                $("#" + toDatePickerId).kendoDatePicker();
+                $("#" + fromDatePickerId).kendoDatePicker({
+                    open: function (e) {
+                        this.options.format = "MM/dd/yyyy";
+                    }
+                });
+                $("#" + toDatePickerId).kendoDatePicker({
+                    open: function (e) {
+                        this.options.format = "MM/dd/yyyy";
+                    }
+                });
                 $("#" + countrySelectorId).kendoMultiSelect({
+                    filter: 'contains',
+                    ignoreCase: true,
                     dataTextField: "officialName()",
                     dataValueField: "id()",
                     dataSource: this.locations(),
@@ -100,13 +109,37 @@ var ViewModels;
                     validator: function (val, otherVal) {
                         return val.length >= otherVal;
                     },
-                    message: 'At least {0} must be selected'
+                    message: 'At least {0} must be selected.'
+                };
+                ko.validation.rules['nullSafeDate'] = {
+                    validator: function (val, otherVal) {
+                        var valid = true;
+                        var format = null;
+                        var YYYYPattern = new RegExp("^\\d{4}$");
+                        var MMYYYYPattern = new RegExp("^\\d{1,}/\\d{4}$");
+                        var MMDDYYYYPattern = new RegExp("^\\d{1,}/\\d{1,}/\\d{4}$");
+                        if((val != null) && (val.length > 0)) {
+                            val = val.trim();
+                            if(YYYYPattern.test(val)) {
+                                val = "01/01/" + val;
+                                format = "YYYY";
+                            } else if(MMYYYYPattern.test(val)) {
+                                format = "MM/YYYY";
+                            } else if(MMDDYYYYPattern.test(val)) {
+                                format = "MM/DD/YYYY";
+                            }
+                            valid = (format != null) ? moment(val, format).isValid() : false;
+                        }
+                        return valid;
+                    },
+                    message: "Date must be valid."
                 };
                 ko.validation.registerExtenders();
+                ko.validation.group(this.values);
                 this.values.title.extend({
                     required: true,
                     minLength: 1,
-                    maxLength: 64
+                    maxLength: 200
                 });
                 this.values.locations.extend({
                     atLeast: 1
@@ -114,7 +147,16 @@ var ViewModels;
                 this.values.types.extend({
                     atLeast: 1
                 });
-                ko.validation.group(this.values);
+                this.values.startsOn.extend({
+                    nullSafeDate: {
+                        message: "Start date must valid."
+                    }
+                });
+                this.values.endsOn.extend({
+                    nullSafeDate: {
+                        message: "End date must valid."
+                    }
+                });
             };
             Activity.prototype.load = function () {
                 var _this = this;
@@ -188,6 +230,9 @@ var ViewModels;
                     _this.values.endsOn.subscribe(function (newValue) {
                         _this.dirtyFlag(true);
                     });
+                    _this.values.onGoing.subscribe(function (newValue) {
+                        _this.dirtyFlag(true);
+                    });
                     _this.values.wasExternallyFunded.subscribe(function (newValue) {
                         _this.dirtyFlag(true);
                     });
@@ -195,9 +240,6 @@ var ViewModels;
                         _this.dirtyFlag(true);
                     });
                     _this.values.types.subscribe(function (newValue) {
-                        _this.dirtyFlag(true);
-                    });
-                    _this.isOnGoing.subscribe(function (newValue) {
                         _this.dirtyFlag(true);
                     });
                     deferred.resolve();
@@ -212,6 +254,23 @@ var ViewModels;
                     this.dirtyFlag(true);
                     this.keyCounter = 0;
                 }
+            };
+            Activity.prototype.getDateFormat = function (dateStr) {
+                var format = null;
+                var YYYYPattern = new RegExp("^\\d{4}$");
+                var MMYYYYPattern = new RegExp("^\\d{1,}/\\d{4}$");
+                var MMDDYYYYPattern = new RegExp("^\\d{1,}/\\d{1,}/\\d{4}$");
+                if((dateStr != null) && (dateStr.length > 0)) {
+                    dateStr = dateStr.trim();
+                    if(YYYYPattern.test(dateStr)) {
+                        format = "yyyy";
+                    } else if(MMYYYYPattern.test(dateStr)) {
+                        format = "MM/yyyy";
+                    } else {
+                        format = "MM/dd/yyyy";
+                    }
+                }
+                return format;
             };
             Activity.prototype.convertDate = function (date) {
                 var formatted = null;
@@ -252,9 +311,11 @@ var ViewModels;
                 }
                 var model = ko.mapping.toJS(this);
                 if(model.values.startsOn != null) {
+                    var dateStr = $("#fromDatePicker").get(0).value;
+                    model.values.dateFormat = this.getDateFormat(dateStr);
                     model.values.startsOn = this.convertDate(model.values.startsOn);
                 }
-                if(this.isOnGoing()) {
+                if((this.values.onGoing != null) && (this.values.onGoing())) {
                     model.values.endsOn = null;
                 } else {
                     if(model.values.endsOn != null) {
@@ -281,6 +342,10 @@ var ViewModels;
             Activity.prototype.save = function (viewModel, event, mode) {
                 var _this = this;
                 this.autoSave(viewModel, event);
+                if(!this.values.isValid()) {
+                    this.values.errors.showAllMessages();
+                    return;
+                }
                 while(this.saving) {
                     alert("Please wait while activity is saved.");
                 }
