@@ -5,17 +5,13 @@
 /// <reference path="../../ko/knockout.extensions.d.ts" />
 /// <reference path="../../ko/knockout.validation.d.ts" />
 /// <reference path="../../kendo/kendouiweb.d.ts" />
+/// <reference path="../../app/SideSwiper.ts" />
+/// <reference path="../../sammy/sammyjs-0.7.d.ts" />
 
 module ViewModels.RepModuleSettings{
 
-
-    export class RepModuleSettings{
-        _welcomeMessage: string;
-        _emailMessage: string;
-
-        constructor(welcomeMessage:string, emailMessage:string){
-            this._welcomeMessage = welcomeMessage;
-            this._emailMessage = emailMessage;
-        }
+        export class RepModuleSettings{
+        welcomeMessage: KnockoutObservableString = ko.observable();
+        emailMessage: KnockoutObservableString = ko.observable();
     }
 }
