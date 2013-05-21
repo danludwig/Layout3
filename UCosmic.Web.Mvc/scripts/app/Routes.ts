@@ -220,7 +220,7 @@ module App.Routes {
                 }
             }
         }
-
+        
         export module My {
             export module Profile {
                 export function get (): string {
@@ -479,9 +479,20 @@ module App.Routes {
         export module Establishments {
             export function show(establishmentId: number) {
                 return makeUrl('establishments/' + establishmentId);
-            }
+            } 
             export function created(params?: any) {
                 var url = makeUrl('establishments/created');
+                if (params) url += '?' + $.param(params);
+                return url;
+            }
+        }
+
+        export module Shared {
+            export function show(SharedId: number) {
+                return makeUrl('Shared/' + SharedId);
+            }
+            export function created(params?: any) {
+                var url = makeUrl('Shared/created');
                 if (params) url += '?' + $.param(params);
                 return url;
             }

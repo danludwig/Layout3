@@ -2,22 +2,15 @@
 @{
     ViewBag.Title = "Institutional Agreement";
 }
-
+@section bib
+{
+    <nav class="bib hide" data-current-bib="agreements">
+        @Html.Partial(MVC.Agreements.Views._Bib)
+    </nav>
+}
 @section scripts
 {
-
-    @Scripts.Render("~/bundles/establishments")
-
-    <script type="text/javascript" src="@Url.Content(Links.scripts.viewmodels.agreements.InstitutionalAgreementEditModel_js)"></script>
-
-    <script type="text/javascript">
-
-        var institutionalAgreementEditModel = new InstitutionalAgreementEditModel();
-        ko.applyBindings(institutionalAgreementEditModel, $('#main')[0]);
-        institutionalAgreementEditModel.sammy().run();
-
-    </script>
-
+      @Scripts.Render("~/bundles/agreements")
 }
 
 <div class="content fixed to-top" data-current-module="agreements">
@@ -35,21 +28,19 @@
                             <header>
                                 <h2>
                                     Participants
-                                    @{
+                                    @*@{
                                         // HACK ALERT this is only temporary
                                         var tenancy = Request.Tenancy() != null
                                             ? Request.Tenancy().StyleDomain
                                             : "default";
-                                    }
-                                    <input type="hidden" value="@tenancy" id="tenancy_domain" />
+                                    }*@
+                                    @*<input type="hidden" value="@tenancy" id="tenancy_domain" />*@
                                 </h2>
                             </header>
                             <div data-bind="visible: isBound" style="display: none;">
                                 <ul data-bind="foreach: participants">
                                     <li data-bind="element: 'participantEl'">
                                         <div class="typed-item" data-bind="with: establishment">
-                                            @*<a href="#" data-bind="attr: { href: '#/participants/remove/' + id() }"
-                                                title="Remove this participant"><i class="red minus on-right"></i></a>*@
                                             <a title="Remove this participant" data-bind="click: $root.removeParticipant"><i class="red minus on-right"></i></a>
                                             <div class="type">
                                                 <span data-bind="visible: $parent.isOwner">Home</span>
@@ -61,7 +52,7 @@
                                                     <span data-bind="visible: officialNameDoesNotMatchTranslation">(<span data-bind="text: officialName"></span>)</span>
                                                 </div>
                                                 <div data-bind="visible: $parent.isNotOwner() && websiteUrl()">
-                                                    <a href="#" target="_blank" data-bind="text: fitWebsiteUrl, attr: { href: 'http://' + websiteUrl() }"></a>
+                                                    <a href="#" target="_blank" data-bind="text: officialUrl, attr: { href: 'http://' + officialUrl() }"></a>
                                                 </div>
                                                 <div data-bind="visible: $parent.isNotOwner() && countryName()">
                                                     <span data-bind="text: countryName"></span>
@@ -71,39 +62,6 @@
                                     </li>
                                 </ul>
                             </div>
-                            @*<div>
-                                <ul>
-                                    <li>
-                                        <div class="typed-item">
-                                            <a href="#/participants/remove/6" title="Remove this participant"><i class="red minus on-right"></i></a>
-                                            <div class="type">
-                                                Home
-                                            </div>
-                                            <div class="item">
-                                                <div>
-                                                    <strong>University of South Florida</strong>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div class="typed-item">
-                                            <a href="#/participants/remove/6" title="Remove this participant"><i class="red minus on-right"></i></a>
-                                            <div class="type">
-                                                Partner
-                                            </div>
-                                            <div class="item">
-                                                <div>
-                                                    <strong>University of Cologne</strong> (Universität zu Köln)
-                                                </div>
-                                                <div>
-                                                    <a href="http://www.uni-koeln.de" target="_blank">www.uni-koeln.de</a>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </li>
-                                </ul>
-                            </div>*@
                             <footer>
                                 <a href="#/participants/add/page/1" class="button">
                                     <i class="green plus"></i>
@@ -121,7 +79,7 @@
                     </aside>
                 </form>
             </div>
-            <div id="participants_add" data-side-swiper="off">
+            @*<div id="participants_add" data-side-swiper="off">
                 <form class="group">
                     <div class="on-left from-top">
                         <header>
@@ -143,7 +101,7 @@
                         </div>
                     </aside>
                 </form>
-            </div>
+            </div>*@
         </div>
     </div>
 </div>

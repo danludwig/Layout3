@@ -536,6 +536,21 @@ var App;
                 Establishments.created = created;
             })(Mvc.Establishments || (Mvc.Establishments = {}));
             var Establishments = Mvc.Establishments;
+            (function (Shared) {
+                function show(SharedId) {
+                    return makeUrl('Shared/' + SharedId);
+                }
+                Shared.show = show;
+                function created(params) {
+                    var url = makeUrl('Shared/created');
+                    if(params) {
+                        url += '?' + $.param(params);
+                    }
+                    return url;
+                }
+                Shared.created = created;
+            })(Mvc.Shared || (Mvc.Shared = {}));
+            var Shared = Mvc.Shared;
             (function (Identity) {
                 (function (Users) {
                     function created(params) {
