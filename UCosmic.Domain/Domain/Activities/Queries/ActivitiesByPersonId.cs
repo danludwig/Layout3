@@ -25,26 +25,23 @@ namespace UCosmic.Domain.Activities
             if (query == null) throw new ArgumentNullException("query");
 
             /* Order as follows:
+             *  All ongoing first by fromDate, then title
              *  If date(s) exist, order by:
-             *      if toDate exists, sort most recent first
-             *      else, use fromData
-             *  then by Type(s?) using order in employee module
-             *  then alphabetically by title
+             *      if toDate exists, sort most recent first else, use fromData
+             *          then alphabetically by title
              *  
-             *  activities with no dates are listed last
+             *  Activities with no dates are listed last
              */
-
-            //var employeeActivityTypesList = _entities.Query<EmployeeActivityType>().ToArray().AsQueryable();
 
             IQueryable<Activity> undatedResults = _entities.Query<Activity>()
                                                            .Where(
                                                                a =>
-                                                               a.Values.Any(v => (v.ModeText == a.ModeText) && 
+                                                               a.Values.Any(v => (v.ModeText == a.ModeText) &&
                                                                !v.StartsOn.HasValue && !v.EndsOn.HasValue) &&
                                                                (a.EditSourceId == null)
                                                             )
                                                            .WithPersonId(query.PersonId)
-                                                           .OrderBy(a => a.Values.FirstOrDefault().Title)
+                                                           .OrderBy(a => a.Values.FirstOrDefault(v => v.ModeText == a.ModeText).Title)
                                                            .ToArray().AsQueryable();
 
             IQueryable<Activity> datedResults = _entities.Query<Activity>()
@@ -53,25 +50,25 @@ namespace UCosmic.Domain.Activities
                                                              a.Values.Any(v => (!v.OnGoing.HasValue || !v.OnGoing.Value) &&
                                                                                (v.ModeText == a.ModeText) &&
                                                                                (v.StartsOn.HasValue || v.EndsOn.HasValue)) &&
-                                                             (a.EditSourceId == null)
-                )
+                                                                               (a.EditSourceId == null)
+                                                          )
                                                          .WithPersonId(query.PersonId)
-                                                         .OrderByDescending(
-                                                             a =>
-                                                             a.Values.FirstOrDefault().EndsOn.HasValue
-                                                                 ? a.Values.FirstOrDefault().EndsOn.Value
-                                                                 : a.Values.FirstOrDefault().StartsOn.Value)
-                                                         .ThenBy(a => a.Values.FirstOrDefault().Title)
-                //.ThenBy(x => x.Values.FirstOrDefault().Types.Select(y => y.Type).OrderBy(y => y.Rank).FirstOrDefault())
+                                                         .OrderByDescending(a =>
+                                                             a.Values.FirstOrDefault(v => v.ModeText == a.ModeText).EndsOn.HasValue
+                                                                 ? a.Values.FirstOrDefault(v => v.ModeText == a.ModeText).EndsOn.Value
+                                                                 : a.Values.FirstOrDefault(v => v.ModeText == a.ModeText).StartsOn.Value)
+                                                         .ThenBy(a => a.Values.FirstOrDefault(v => v.ModeText == a.ModeText).Title)
                                                          .ToArray().AsQueryable();
 
             IQueryable<Activity> results = _entities.Query<Activity>()
                                                            .Where(
                                                                a =>
-                                                               a.Values.Any(v => v.OnGoing.HasValue && v.OnGoing.Value))
+                                                               a.Values.Any(v => v.OnGoing.HasValue && v.OnGoing.Value) &&
+                                                               (a.EditSourceId == null)
+                                                            )
                                                            .WithPersonId(query.PersonId)
-                                                           .OrderByDescending(a => a.Values.FirstOrDefault().StartsOn.Value)
-                                                           .ThenBy(a => a.Values.FirstOrDefault().Title)
+                                                           .OrderByDescending(a => a.Values.FirstOrDefault(v => v.ModeText == a.ModeText).StartsOn.Value)
+                                                           .ThenBy(a => a.Values.FirstOrDefault(v => v.ModeText == a.ModeText).Title)
                                                            .ToArray().AsQueryable()
                                                            .Concat(datedResults)
                                                            .Concat(undatedResults);
